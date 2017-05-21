@@ -1,14 +1,14 @@
 {
     "collab_server" : "",
-    "contents" : "baseurl = \"/\"\nrelativeurls = true\nlanguageCode = \"en-us\"\ntitle = \"An analysis of random things\"\ntheme = \"blackburn\"\ngoogleAnalytics = \"\"\ndisqusShortname = \"\"\nignoreFiles = [\"\\\\.Rmd$\", \"_files$\", \"_cache$\"]\n\n[permalinks]\n    post = \"/:year/:month/:day/:slug/\"\n\n[[menu.main]]\n    name = \"About\"\n    url = \"/about/\"\n[[menu.main]]\n    name = \"GitHub\"\n    url = \"https://github.com/Runze\"\n[[menu.main]]\n    name = \"Twitter\"\n    url = \"https://twitter.com/runze_w\"\n\n[params]\n    description = \"A website built through Hugo and blogdown.\"\n\n    # options for highlight.js (version, additional languages, and theme)\n    highlightjsVersion = \"9.11.0\"\n    highlightjsCDN = \"//cdn.bootcss.com\"\n    highlightjsLang = [\"r\", \"yaml\"]\n    highlightjsTheme = \"github\"\n\n    MathJaxCDN = \"//cdn.bootcss.com\"\n    MathJaxVersion = \"2.7.1\"\n\n    [params.logo]\n    url = \"Puppy.jpg\"\n    width = 50\n    height = 50\n    alt = \"Logo\"\n\n",
+    "contents" : "baseurl = \"/\"\nrelativeurls = true\nlanguageCode = \"en-us\"\ntitle = \"An analysis of random things\"\ntheme = \"blackburn\"\ngoogleAnalytics = \"\"\ndisqusShortname = \"\"\nignoreFiles = [\"\\\\.Rmd$\", \"_files$\", \"_cache$\"]\npublishDir = \"../Runze.github.io\"\n\n[permalinks]\n    post = \"/:year/:month/:day/:slug/\"\n\n[[menu.main]]\n    name = \"About\"\n    url = \"/about/\"\n[[menu.main]]\n    name = \"GitHub\"\n    url = \"https://github.com/Runze\"\n[[menu.main]]\n    name = \"Twitter\"\n    url = \"https://twitter.com/runze_w\"\n\n[params]\n    description = \"A website built through Hugo and blogdown.\"\n\n    # options for highlight.js (version, additional languages, and theme)\n    highlightjsVersion = \"9.11.0\"\n    highlightjsCDN = \"//cdn.bootcss.com\"\n    highlightjsLang = [\"r\", \"yaml\"]\n    highlightjsTheme = \"github\"\n\n    MathJaxCDN = \"//cdn.bootcss.com\"\n    MathJaxVersion = \"2.7.1\"\n\n    [params.logo]\n    url = \"Puppy.jpg\"\n    width = 50\n    height = 50\n    alt = \"Logo\"\n\n",
     "created" : 1495347920637.000,
     "dirty" : false,
     "encoding" : "UTF-8",
     "folds" : "",
-    "hash" : "3333667902",
+    "hash" : "3600784029",
     "id" : "C0FD44D1",
-    "lastKnownWriteTime" : 1495392102,
-    "last_content_update" : 1495392102875,
+    "lastKnownWriteTime" : 1495396032,
+    "last_content_update" : 1495396032532,
     "path" : "~/Documents/blog/config.toml",
     "project_path" : "config.toml",
     "properties" : {
