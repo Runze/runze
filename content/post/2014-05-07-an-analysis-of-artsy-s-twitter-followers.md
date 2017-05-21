@@ -30,29 +30,29 @@ Finally, R time!
 
 The first analysis I did was to analyze the geographic distribution of these followers.  Below is a heat map I created with darker blue indicating countries with more followers and lighter blue indicating fewer.  Note I did not show countries with 0 follower in order to not distort the calculation of the quantiles (as there are quite a lot of them).  My primary resource / reference for this task are the Data Science Toolkit ([link](http://www.datasciencetoolkit.org/)) for mapping the twitter locations to the standardized country names ([update] another approach is probably to use the spatial mapping) and “R Graphics Cookbook” ([link](http://shop.oreilly.com/product/0636920023135.do)) and this awesome stackoverflow post ([link](http://stackoverflow.com/questions/9558040/ggplot-map-with-l)) for making the chart.
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/heatmap.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/heatmap.jpeg" alt="alt text" width="600">
 
 As we can see, Artsy’s followers are located all over the world.  Specifically, the U.S., Canada, Australia, and many European countries share the top 10 percentile.  Notably, China also made it to the top 30 percentile despite that twitter is blocked over there!
 
 Now let’s look at these followers’ friend count and follower count.  Intuitively, a user with many friends indicates that he/she is an active or “seasoned” twitter user, and a user with many followers indicates that he/she is probably an influential user.  First, a histogram showing the followers’ friend count:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/friends.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/friends.jpeg" alt="alt text" width="600">
 
 Then the followers’ follower count:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/followers.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/followers.jpeg" alt="alt text" width="600">
 
 As shown by the density plot on top of the histogram, the friend count peaks at around 1,300 with another spur on the higher end at around 3,000, which implies that Artsy’s followers also follow many other accounts and are, therefore, quite active on twitter.  As for the follower count, it is closer to what I expected in that it peaks at the lower end and gradually flattens out.  However, it is somewhat a long tail, implying that many of the followers have a decent number of followers and are very influential themselves as well.
 
 Lastly, let’s look at the twitter ages of these followers. To do that, I parsed the age (in days) using the account creation date and plotted the histogram below.
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/age.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/age.jpeg" alt="alt text" width="600">
 
 As it turned out, most followers are quite “young” in twitter age, usually close to one year, potentially implying that Artsy was among the first few accounts they followed. However, I wouldn’t go ahead and assume their real age based on this because they might be either very young and new to social media or very old and new to social media. Either way, as new adopters, it is possible they are also active users.
 
 Let’s move on to analyzing the followers’ friends.  For this piece, I was curious to see who the common friends are in hope to gain some insights into Artsy’s followers’ general interests.  To do that, I first merged the followers with their friends and align them side by side so that Gephi can recognize each row as a network edge (i.e., follower -> friend).  After feeding the data to Gephi, I chose to rank each node per “in-degree,” which is the number of edges that end in a particular node.  In my case, more in-degrees mean more followers for a particular account.  The ranking is visualized by the label size.  Below is the graph (note to better present the top accounts, I limited the data to only include friends that have at least 300 followers, which in my dataset gives me the top 19; note also I excluded Artsy itself, which would have been the biggest node):
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/Gephi.png)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/Gephi.png" alt="alt text" width="600">
 
 As we can see, the followers of Artsy are real art lovers as their top friends are all museums or galleries.  In addition, the color of the edges represents the cluster that each user Gephi assigns to.  In this case, Gephi identified four clusters based on the common friends among followers. [update] to be honest, I didn’t need to use Gephi to do that – I could’ve simply tabled the results up, but I was looking for an interesting dataset to use Gephi with, so there you have it.
 
@@ -60,23 +60,24 @@ As we can see, the followers of Artsy are real art lovers as their top friends a
 
 Inspired by this analysis performed by thetwoweeker, I decided to do more with the data I have. First, I tried to infer the gender of the followers based on their names (not the screen name). In order to do that, I first crawled the top 1,000 English names as of 2000 and 2010 from the social security [website](http://www.ssa.gov/oact/babynames/) and kept the unique male and female names from the 2 lists. Then I matched them against the first names extracted from the followers’ names. Obviously, there were a lot of mismatches, but, out of the 85,000 followers, I was lucky enough to match 45,000 of them. Using these samples, I was able to get a decent picture of the gender distribution, as shown below:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/gender.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/gender.jpeg" alt="alt text" width="600">
 
 Perhaps not surprisingly, most of the followers are ladies. But who are these people exactly? My resources to tell that is quite limited. Here, inspired by thetwoweeker’s post linked above, I parsed out all the words these people used to describe themselves in their bio, and made a word cloud out of them. Here is what it looks like:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/bio.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/bio.jpeg" alt="alt text" width="600">
 
 As it turns out, most of these people don’t just follow Artsy on a whim – they also used “art” and art-related phrases to describe themselves. This seems to me a further indication that they are real art-lovers or creative professionals. (funny “gmail” is also one of the common terms – really? Some people just put their email addresses on twitter? What if someone like me crawled them down?)
 
 Finally, let’s do some clustering to see if we can separate them and understand them better. In terms of measuring distance in the clustering algorithms, thetwoweeker makes a very good point that spherical k-means serves as a better distance metric than euclidean distance when it comes to text mapping. Therefore, after creating a document term matrix made of all the non-empty bios, I fed it directly into the skmeans function included in the skmeans package, and created 4 clusters (a result of trial and error). Below are the word clouds created using the words from the bios in these 4 clusters:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/bio1.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/bio1.jpeg" alt="alt text" width="600">
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/bio2.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/bio2.jpeg" alt="alt text" width="600">
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/bio3.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/bio3.jpeg" alt="alt text" width="600">
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/bio4.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/bio4.jpeg" alt="alt text" width="600">
+
 
 Starting from the top left, the first cluster is interesting in that the subjects (or the nouns) do not have any overarching themes, but the algorithm groups them together because of the common use of “love.” After reading more of these words, I also found many other positive terms such as “enjoy,” “good,” “fun,” and “beautiful.” Therefore, in lack of a better term, I define them as people who love everything.
 
@@ -88,10 +89,10 @@ The last cloud is also interesting. First of all, it looks a bit funny as compar
 
 How many of Artsy’s followers fall under each bucket? Well, let’s see:
 
-![](/post/2014-05-07-an-analysis-of-artsy-s-twitter-followers/cluster.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/artsy/master/graph/cluster.jpeg" alt="alt text" width="600">
 
 As it turns out, most of the people are art professionals and art students. Sadly, the real artists are quite few, but, hey, maybe most people are just modest!
 
-Conclusion
+### Conclusion
 
 Twitter is fun and Artsy has an impressively large group of followers. They come from all over the world, very active on twitter and museums, mostly ladies, and mostly art professionals. I would say the company is targeting the right audience, but they probably have already known that.
