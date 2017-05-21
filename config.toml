@@ -6,7 +6,6 @@ theme = "blackburn"
 googleAnalytics = ""
 disqusShortname = ""
 ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
-publishDir = "../Runze.github.io"
 
 [permalinks]
     post = "/:year/:month/:day/:slug/"
