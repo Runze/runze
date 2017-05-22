@@ -11,4 +11,6 @@ This is my dog and, if you look carefully, that is me behind:
 
 I'm an okay data scientist, an avid language-learner, and a self-proclaimed art-lover. And that's really all that is interesting about me.
 
+If you insist on knowing more, you can reach me at ernuzwang@gmail.com.
+
 Bye.
