@@ -18,8 +18,4 @@ Last night I tried my hands on a [Quora challenge](http://www.quora.com/challeng
 
 Anyway, I found this challenge quite interesting and, based on my exploratory plots, some of the variables are indeed quite correlated with the classification outcome. As my first attempt, I tried 4 simple models: logistic regression, SVM, random forest, and gradient boost trees, of which, I found the last two outperform the first. By combining the two together, I scored an ROC of .897 on the test data! Needless to say, I'm quite surprised by the result although I still wish I could take a peak at the actual variable names to see what the best indicators really are.
 
-My code is hosted on my [github](https://github.com/Runze/quora_classification_challenge) and below is the knitr output hosted on [RPubs](http://rpubs.com/runzemc/quora_classification_challenge):
-
-[iframe src="http://rpubs.com/runzemc/quora_classification_challenge" width="100%" height="17350"]
-
-Fun! :-)
+My code is hosted on my [github](https://github.com/Runze/quora_classification_challenge) and below is the knitr output hosted on [RPubs](http://rpubs.com/runzemc/quora_classification_challenge).

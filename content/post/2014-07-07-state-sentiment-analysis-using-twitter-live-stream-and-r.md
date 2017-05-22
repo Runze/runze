@@ -1,5 +1,5 @@
 ---
-author: ernuzwang@gmail.com
+author: Runze
 comments: true
 date: 2014-07-07 03:33:22+00:00
 link: http://www.runzemc.com/2014/07/state-sentiment-analysis-using-twitter-live-stream-and-r.html
@@ -15,9 +15,6 @@ tags:
 - Shiny
 - Twitter
 ---
-
-<blockquote>The R code used to create this project has been uploaded to [github](https://github.com/Runze/twitter_sentiment).</blockquote>
-
 
 This week I started taking this Coursera [class](https://class.coursera.org/datasci-002) called Introduction to Data Science taught by Bill Howe from University of Washington. Although there has only been one lesson so far, my experience has been quite positive particularly due to the interesting programing assignment, which is to use twitter's live stream data to analyze tweet sentiment. If you are interested and want to try yourself, you can read the very helpful instruction [here](https://class.coursera.org/datasci-002/assignment/view?assignment_id=3) and clone the git [here](https://class.coursera.org/datasci-002/wiki/GithubInstructions) (I believe you can access it without signing up for the class, but the course is free anyway). The assignment is given in Python, and, despite a few wrapper functions, students are required to write the majority of the code, which, needless to say, was a very good exercise to me (and to anyone who's learning Python).
 
@@ -47,12 +44,13 @@ To illustrate, if we received 3 tweets from a state and the sentiment scores for
 
 Now we have all the data to present the results. I first created 2 heat maps showing 1) the sentiment changes in the 5-second interval and 2) the cumulative sentiment calculated with all the tweets gathered so far. Below are the 2 charts after I had it run for 14 minutes:
 
-[![Screen Shot 2014-08-18 at 7.44.01 PM](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.44.01-PM-1024x381.png)](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.44.01-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-07-06-at-3.22.01-PM.png)The cumulative chart is more immune to the small sample problem and it gives a nice stable picture as the anomalies are gradually drowned out. As a result, you can see what states are really happy (I'm moving to South Dakota). However, it doesn't show any fluctuation of the moods throughout the time, which the left graph does. To be honest, the 5-second interval may be a bit too short to generalize (I get on average 150 tweets per each interval), but for web display purposes, a longer wait period may bore the users instead.
+<img src="https://raw.githubusercontent.com/Runze/twitter_sentiment/master/screenshot.png" alt="alt text" width="700">
+
+The cumulative chart is more immune to the small sample problem and it gives a nice stable picture as the anomalies are gradually drowned out. As a result, you can see what states are really happy (I'm moving to South Dakota). However, it doesn't show any fluctuation of the moods throughout the time, which the left graph does. To be honest, the 5-second interval may be a bit too short to generalize (I get on average 150 tweets per each interval), but for web display purposes, a longer wait period may bore the users instead.
 
 The drawback of the 2 charts above is that it doesn't explicit show any historical movement. Therefore, I made this line chart in addition that plots the scores calculated using the tweets collected in each 5-second interval (i.e., all the data that are used to make the chart on the left above). Instead of charting them on the state level, I decided to chart them on the time zone level instead hoping to futher reduce the noise and see how the mood changes for people who are all at the same time of a day. However, this is to ignore the interstate variance within a single time zone. Below is the result after I let it run for over 30 minutes:
 
-[![Screen Shot 2014-08-18 at 8.29.26 PM](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-8.29.26-PM-1024x326.png)](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-8.29.26-PM.png)
+<img src="https://raw.githubusercontent.com/Runze/twitter_sentiment/master/screenshot_2.png" alt="alt text" width="700">
 
 The loess-smoothed lines are shown along with the raw data points to indicate the general trend. It seems that, despite a few small swings, the trends are generally flat and centered around the neutral. This may be due to 1) the short time period (it is unlikely to see a big overarching mood swing within half an hour), 2) the sample size (not all the tweets are geo-coded; in fact, I think only a small amount are), 3) the way I estimate sentiment scores for individual tweets and the whole region, and/or 4) the neighborhood size that loess takes to build the weighted regression model (the default span value of 0.75 was selected). Due to the limitation of the live web app, I'm planning to rerun the analysis but first collect all the tweets for a whole week (excluding late nights and early mornings). Hopefully, I can get some cool clear trends like those shown in the research linked above.
 

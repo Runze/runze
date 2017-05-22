@@ -1,5 +1,5 @@
 ---
-author: ernuzwang@gmail.com
+author: Runze
 comments: true
 date: 2014-09-26 17:31:57+00:00
 link: http://www.runzemc.com/2014/09/analyzing-chinas-post-80s.html
@@ -28,9 +28,7 @@ Like Twitter, Weibo provides an API that can be used to retrieve user informatio
 
 Since we can't possibly get tweets from all 500 million users, the first step is to decide which users to "target at." To do that, I used Weibo's [search](http://www.weibo.com/find/f) function, which, as shown below, allows one to specify a bunch of criteria, including location, age, and gender, to find a set of users that meet these criteria. Each requests return 50 pages of users, which amount to 500 users in total.
 
-[![Screen Shot 2014-09-25 at 10.36.13 PM](http://www.runzemc.com/wp-content/uploads/2014/09/Screen-Shot-2014-09-25-at-10.36.13-PM-1024x729.png)](http://www.runzemc.com/wp-content/uploads/2014/09/Screen-Shot-2014-09-25-at-10.36.13-PM.png)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/weibo_screenshot.png" alt="alt text" width="600">
 
 The page requires you to specify at least one criteria, hence, to maximize the number of users I can get without going overboard, I looped over all the provinces available while keeping other criteria except age unspecified. To keep my subject the post-80s, I restricted the age to be between 23 and 29. This way, I got 17,000 users in total.
 
@@ -42,9 +40,7 @@ Using a list of over 4,000 users, I queried another website called [Weibo Life
 
 After getting all these data, I switched to R to analyze them (again I could've done the whole scraping in R as well). Because I was planing to take all these 500,000 tweets as a corpus and ignore the user-specific factors, the first thing I did was to check if the tweets-per-user distribution is rather normal as opposed to only a few users generated 5 full pages of tweets.
 
-[![ids_hist](http://www.runzemc.com/wp-content/uploads/2014/09/ids_hist-300x296.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/ids_hist.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/ids_hist.jpeg" alt="alt text" width="600">
 
 As shown above, although not exactly normal, we don't have a long tail on the right, indicating most users have an equal voice in our dataset.
 
@@ -52,51 +48,39 @@ Being more comfortable with the data, the next step is to figure out how to mine
 
 Due to these challenges, to my knowledge, there is not yet a widely-accepted algorithm, not to mention an R package, available for mining Chinese texts yet. Hence, for this analysis, I took a simple route by first defining a set of topics that I'm interested in and brainstorming a bunch of keywords for them (which, based on my review of some tweets, are likely to be used in those topics), and using these keywords to find the tweets that potentially fall into those buckets. Below is a table showing the 21 topics I defined (based on pure curiosity) and the keywords I came up with:
 
-[![Screen Shot 2014-09-25 at 7.31.15 PM](http://www.runzemc.com/wp-content/uploads/2014/09/Screen-Shot-2014-09-25-at-7.31.15-PM-300x235.png)](http://www.runzemc.com/wp-content/uploads/2014/09/Screen-Shot-2014-09-25-at-7.31.15-PM.png)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/weibo_screenshot_2.png" alt="alt text" width="600">
 
 If you read Chinese, you'll notice that when defining keywords, I tried to avoid single characters due to the reason described above. Doing this may leave out some tweets for certain topics, but my experience of trial and error shows that you can never be too strict - even using these, I still end up with many irrelevant tweets. For example, the word panda in Chinese, 熊猫, is composed of 熊, bear, and 猫, cat (hence, literally bear cat). As a result, using 猫 as the keyword to capture all tweets related to cat will unfortunately also capture a bunch of pandas, and it certainly doesn't help that panda is a commonly-used emoticon on Weibo, which, when scraped from the website, just shows the text itself. However, eliminating 猫 as a keyword also kicks out the majority of mentions regarding cat since, unlike other Chinese characters mentioned above, you don't need to pair anything with 猫 to refer to the animal. Hence, without a better solution, I just left it as is and treated pandas as cats.
 
 With all the topics and the (imperfectly selected) keywords, I proceeded to calculate the percentage of tweets mentioning these keywords and, thus, roughly pertaining to these topics. First, let's look at the mentions of the 16 broad topics (stopping before iPhone):
 
-[![mention_broad](http://www.runzemc.com/wp-content/uploads/2014/09/mention_broad-1024x512.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_broad.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_broad.jpeg" alt="alt text" width="600">
 
 As shown above, love appears to be most universal topic, implying that the post-80s today, being in their mid- to late-20s, spend a lot of time brooding over love. After seeing pages and pages of tweets talking and, most of the time, arguing about and questioning love, I found it not surprising at all. The second most discussed topic, again, is not surprising either given the mass popularity of foreign TV shows, most of which are American, British, and Korean. Interestingly, when it comes to American TV shows, it is usually not the most critically-acclaimed ones that garnered the most attention. Instead, most of the time it's the minor TV shows that inspired loyal following (think CW). What comes next is academic, which still makes sense considering many of us just finished schools a couple years ago and some of us are still in graduate schools. Finally, there comes marriage, which I had honestly expected to appear even earlier given the whole non-stopping discussions on it and the related topics such as the "left-over women" and the various dating shows. With that, I'll leave the rest of the topics alone and move on to the fierce battle in the Chinese smart phone market:
 
-[![mention_phone](http://www.runzemc.com/wp-content/uploads/2014/09/mention_phone-300x300.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_phone.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_phone.jpeg" alt="alt text" width="600">
 
 It seems that, despite all the buzz that Xiaomi and Samsung have created, at least based on social media mentions, iPhone is still the king of the smartphones. However, this analysis is possibly biased because I did it right after iPhone 6 went on sale. Nevertheless, Xiaomi, the local high-profile smartphone-maker, certainly surpassed Samsung.
 
 Lastly, let's try to resolve the age-long battle between dogs and cats to see which are more favored by the post-80s:
 
-[![mention_dog vs. cat](http://www.runzemc.com/wp-content/uploads/2014/09/mention_dog-vs.-cat-300x300.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_dog-vs.-cat.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_dog vs. cat.jpeg" alt="alt text" width="600">
 
 Alas, it seems that most post-80s are cat persons! Given the close results, I'm just going to go ahead and say the comparison was rigged because most of the extra cats were impostors by pandas.
 
 After looking at all these topics on the whole, let's explore whether there is any geographic difference among each topic. However, for some reasons, the tweets I got are not evenly distributed among all regions. As shown below, we have a lot of regions that have 0 or near-0 tweets:
 
-[![regions_hist](http://www.runzemc.com/wp-content/uploads/2014/09/regions_hist-300x296.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/regions_hist.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/regions_hist.jpeg" alt="alt text" width="600">
 
 One of the reasons may be that, for those regions, I got mostly business accounts from the search results and hence excluded them in the analysis. To prevent them from skewing the result, I removed all the regions that have tweets less than the 25th percentile and ended up with 22 regions in total.
 
 Given that most of these places will show similar topic mentions (because, after all, people from the same generation can not be too different from place to place), I picked the 3 most geographically-diverse topics to present. I identified them by first computing the percentage of mentions per region for each topic, calculating the standard deviation of the metric across all regions, and identifying the 3 topics that generated the highest standard deviations (hence exhibiting the largest regional difference). The resulting 3 topics are TV/movies, food, and, once again, love. Their percentage mentions for the top 10 regions are shown below:
 
-[![mention_region_1](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_1-1024x512.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_1.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_region_1.jpeg" alt="alt text" width="600">
 
-[![mention_region_2](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_2-1024x512.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_2.jpeg)
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_region_2.jpeg" alt="alt text" width="600">
 
-[![mention_region_3](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_3-1024x512.jpeg)](http://www.runzemc.com/wp-content/uploads/2014/09/mention_region_3.jpeg)
-
-
+<img src="https://raw.githubusercontent.com/Runze/weibo/master/mention_region_3.jpeg" alt="alt text" width="600">
 
 Visually, it appears that food shows the most diverse pattern within the top 10 regions. Specifically, Hunan, known for its spicy food, greatly surpassed the other provinces and seems to have the most foodies. Meanwhile, Chongqing, known for, among other things, its cloudy weather and relaxed lifestyle, watches the greatest amount of TVs and films, and Heilongjiang, being in the far north of China, are the most love-struck (the two are probably not really correlated).
 

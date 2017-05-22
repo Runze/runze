@@ -1,5 +1,5 @@
 ---
-author: ernuzwang@gmail.com
+author: Runze
 comments: true
 date: 2014-08-12 06:49:26+00:00
 link: http://www.runzemc.com/2014/08/filtered-twitter-timeline.html
@@ -22,8 +22,9 @@ But that's not all of it. Say you follow a popular news source like NYT that has
 
 Here is my finished [app](http://runzemc.shinyapps.io/timeline/), which, when opened, pulls the most recent 400 tweets** from my timeline,*** calculates such a metric for all of them, and filters to only show the top 100. This is what it looks like:
 
-[![Screen Shot 2014-08-18 at 7.57.50 PM](http://www.runzemc.com/wp-content/uploads/2014/08/Screen-Shot-2014-08-18-at-7.57.50-PM-1024x549.png)](http://www.runzemc.com/wp-content/uploads/2014/08/Screen-Shot-2014-08-18-at-7.57.50-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/08/Screen-Shot-2014-08-11-at-10.50.52-PM.png)Hopefully I'll now have enough patience to read all 100 of them :-)
+<img src="https://raw.githubusercontent.com/Runze/twitter_timeline_filtering/master/screenshot.png" alt="alt text" width="600">
+
+Hopefully I'll now have enough patience to read all 100 of them :-)
 
 Note:
 

@@ -47,7 +47,7 @@ If you use Goodreads, you'll notice that its genre tags are very similar to th
 
 After constructing such a "weighted" DTM, to determine the optimal number of splits, I ran a bunch of LDAs on it and found 20 sufficient to summarize most, if not all, of the genres. These 20 topics, along with their top 5 tags and the number of corresponding books, are illustrated below:
 
-[![genre_table](http://www.runzemc.com/wp-content/uploads/2014/10/genre_table1-1024x551.png)](http://www.runzemc.com/wp-content/uploads/2014/10/genre_table1.png)
+<img src="https://raw.githubusercontent.com/Runze/book_recommender/master/genre_table.png" alt="alt text" width="700">
 
 It seems that the model did a decent job at separating general fiction from nonfiction, and adequately distinguished between modern and classical literature and biography and popular science. However, when it comes to digging deeper into the themes or topics, it was sometimes confused by some specific terms used. For example, it grouped World War II and Star Wars together due to the common use of the tag "war," and, for some strange reasons I'm still not quite sure of, it put them together with "health." I guess such phenomenon is partly due to the use of tags with specific references (e.g., "young adult historical fiction"), which makes it harder for the algorithm to find common themes. In fact, based on the perplexity curve generated using a number of topics, 20 is not really the optimal split as the perplexity metric continues to decrease after 20. I had to stop at 20 because going further would leave certain buckets with too few books. At this time I'm still tinkering the genre tags and experimenting new ways to cut and group them more accurately.
 
@@ -55,7 +55,7 @@ It seems that the model did a decent job at separating general fiction from non
 
 Matching a new book to a particular genre bucket is the first step of recommendation. What comes next is to compare its description with those of all the books put in that bucket based on the modeling result above. Before comparing the descriptions, we need to clean them first. To do that, I simply kept all the alphabetic characters and ran a [part-of-speech](http://cs.nyu.edu/grishman/jet/guide/PennPOS.html) tags on them and only kept adjectives, nouns (but not pronouns), and verbs for each description because, based on my experience, these words best describe a book and more words may introduce noise. After removing these extra words, each book has on average 64 words to describe them. Out of curiosity, I extracted the top 10 terms used to describe the books of each genre and here are the results:
 
-[![Screen Shot 2014-10-17 at 11.33.08 PM](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-17-at-11.33.08-PM-1024x541.png)](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-17-at-11.33.08-PM.png)
+<img src="https://raw.githubusercontent.com/Runze/book_recommender/master/term_table.png" alt="alt text" width="700">
 
 By comparing it side by side with the genre table above, I did find some interesting patterns and common themes. For example,
 
@@ -119,13 +119,15 @@ Now with genre buckets and cleaned descriptions, we can finally take our model
 
 Now let's try 2 books: one fiction and one non-fiction, and see how the recommender does.
 
-For the fiction, I chose the last fiction I read -- [_Colorless Tsukuru Tazaki and His Years of Pilgrimage,_](http://www.amazon.com/Colorless-Tsukuru-Tazaki-Years-Pilgrimage/dp/0385352107) and these are the recommendations I got (due to space constraint, only the top 5 recommended books are shown):[![Screen Shot 2014-10-18 at 12.14.30 AM](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-18-at-12.14.30-AM-1024x551.png)](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-18-at-12.14.30-AM.png)
+For the fiction, I chose the last fiction I read -- [_Colorless Tsukuru Tazaki and His Years of Pilgrimage,_](http://www.amazon.com/Colorless-Tsukuru-Tazaki-Years-Pilgrimage/dp/0385352107) and these are the recommendations I got (due to space constraint, only the top 5 recommended books are shown):
+
+<img src="https://raw.githubusercontent.com/Runze/book_recommender/master/screenshot_1.png" alt="alt text" width="700">
 
 It seems that the recommender has picked up themes such as friendship, secrets, and coming-of-age. However, with the exception of the first book, I wouldn't recommend any of them to someone who enjoyed the book at issue. It's not that these are not good books, but they are just not directly comparable in my opinion (especially the religious one). This is actually a common mistake I've seen while testing the model because, by relying completely on the limited words used to describe a book, the themes it can discover is simply too superficial. What's worse, to avoid any spoilers, some descriptions are too cryptic for the model to make anything out of them. Hence, as interesting and ambitious as it is to mine the descriptions, I think the focus should still be on the genres themselves. In absence of a more thorough description, classifying a book under the right category with enough granularity should complement the lack of specificity in the description.
 
 Now let's look at nonfiction. Once again I picked the last nonfiction I read -- [_The Social Animal_](http://www.amazon.com/The-Social-Animal-Character-Achievement/dp/0812979370), which, by the way, is a very enlightening and fun book. Using that, I got these books in return:
 
-[![Screen Shot 2014-10-18 at 12.39.31 AM](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-18-at-12.39.31-AM-1024x607.png)](http://www.runzemc.com/wp-content/uploads/2014/10/Screen-Shot-2014-10-18-at-12.39.31-AM.png)
+<img src="https://raw.githubusercontent.com/Runze/book_recommender/master/screenshot_2.png" alt="alt text" width="700">
 
 I am much more happier with the results this time as it successfully picked up the sociology and psychology themes, which is kind of expected since it's often easier to describe a nonfiction than a fiction and one runs into less trouble of taking words as is.
 

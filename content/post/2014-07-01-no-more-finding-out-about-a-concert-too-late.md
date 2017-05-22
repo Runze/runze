@@ -1,5 +1,5 @@
 ---
-author: ernuzwang@gmail.com
+author: Runze
 comments: true
 date: 2014-07-01 06:40:44+00:00
 link: http://www.runzemc.com/2014/07/no-more-finding-out-about-a-concert-too-late.html
@@ -14,9 +14,6 @@ tags:
 - Shiny
 ---
 
-<blockquote>The R code used to create this app has been uploaded to [github](https://github.com/Runze/pitchfork).</blockquote>
-
-
 After the numerous times of finding out about a concert too late and ending up either paying a premium or not being able to go, I finally decided to do something about it, and this is what I came up with.
 
 [https://runzemc.shinyapps.io/pitchfork/](https://runzemc.shinyapps.io/pitchfork/)
@@ -27,12 +24,12 @@ Screenshot time!
 
 Here is a snapshot of the upcoming concerts in LA:
 
-[![Screen Shot 2014-08-18 at 7.47.35 PM](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-7.47.35-PM-1024x600.png)](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-7.47.35-PM.png)
+<img src="https://raw.githubusercontent.com/Runze/pitchfork/master/screenshot_1.png" alt="alt text" width="700">
 
 Each link will open the search result of the artist on [Songkick](http://www.songkick.com/), where one can buy tickets or follow the artist (you are welcome).
 
 Below is the artist tab for Lorde, who is coming to LA in October (not shown in the snapshot page)!
 
-[![Screen Shot 2014-08-18 at 7.49.40 PM](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-7.49.40-PM-1024x598.png)](http://www.runzemc.com/wp-content/uploads/2014/07/Screen-Shot-2014-08-18-at-7.49.40-PM.png)
+<img src="https://raw.githubusercontent.com/Runze/pitchfork/master/screenshot_2.png" alt="alt text" width="700">
 
 Enjoy the concert :-)

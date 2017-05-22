@@ -1,5 +1,5 @@
 ---
-author: ernuzwang@gmail.com
+author: Runze
 comments: true
 date: 2014-06-22 04:32:24+00:00
 link: http://www.runzemc.com/2014/06/an-analysis-of-the-most-played-artists-on-kcrw.html
@@ -13,9 +13,6 @@ tags:
 - R
 - Shiny
 ---
-
-<blockquote>The code to web-crawl the playlist and to create the shiny app has been uploaded to [github](https://github.com/Runze/kcrw).</blockquote>
-
 
 [R Shiny](http://shiny.rstudio.com/) is an R package that is designed to easily create and deploy pretty web apps all in the nifty RStudio. Right now, it may not be able to make sophisticated or aesthetically pleasing web apps like d3.js, but, by leveraging R's powerhouse analytical capability, I believe it has great potentials. One possible application I can think of is education. Take this [k-means app](http://shiny.rstudio.com/gallery/kmeans-example.html) for instance, I wish I had a chance to play with this interactive app when learning about the algorithm myself.
 
@@ -37,17 +34,17 @@ By the way, I learned Shiny mostly from this awesome tutorial put together by [
 
 After getting the data ready, the first thing I was eager to find out is who the top artists are. Below is the output from my app showing the top 20 artists covering the entire period:
 
-[![Screen Shot 2014-08-18 at 7.21.43 PM](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.21.43-PM-1024x521.png)](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.21.43-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-06-22-at-12.06.15-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-06-21-at-8.02.43-PM.png)The legend is ordered by the ranking (in the descending order) and goes from top to bottom and then left to right. To be honest, I was a little surprised that Beck took the crown jewel. In fact, looking at the data, I found that he was played consistently throughout the whole time. Nevertheless, some of my favorite artists (e.g., Phoenix, Disclosure, Bonobo, Vampire Weekend, and James Blake) did make it to the top 20.
+<img src="https://raw.githubusercontent.com/Runze/kcrw/master/screenshot.png" alt="alt text" width="700">
+
+The legend is ordered by the ranking (in the descending order) and goes from top to bottom and then left to right. To be honest, I was a little surprised that Beck took the crown jewel. In fact, looking at the data, I found that he was played consistently throughout the whole time. Nevertheless, some of my favorite artists (e.g., Phoenix, Disclosure, Bonobo, Vampire Weekend, and James Blake) did make it to the top 20.
 
 Above we looked at the all-day playlists, but is there a difference between the music played during the daytime and night? To answer this question, I split the data into 2 parts based on the timestamp, i.e., one for the daytime (6 am - 6 pm) and one for the night (6 pm - 6 am). Because afternoon and early evening are usually taken by news at KCRW, we don't have any problem for the cutoff time (there is rarely any music played around either 6 am or 6 pm). First, let's look at the daytime:
 
-[![daytime](http://www.runzemc.com/wp-content/uploads/2014/06/daytime-1024x591.png)](http://www.runzemc.com/wp-content/uploads/2014/06/daytime.png)
+<img src="https://raw.githubusercontent.com/Runze/kcrw/master/daytime.png" alt="alt text" width="700">
 
 And then during the night:
 
-[![nighttime](http://www.runzemc.com/wp-content/uploads/2014/06/nighttime-1024x596.png)](http://www.runzemc.com/wp-content/uploads/2014/06/nighttime.png)
+<img src="https://raw.githubusercontent.com/Runze/kcrw/master/nighttime.png" alt="alt text" width="700">
 
 Despite the overlaps, we do see a lot of variation. For example, Disclosure is much more heavily played at night, which makes sense (really, I can't imagine anyone turning down [this](https://www.youtube.com/watch?v=n0FOPTYJPXw&feature=kp) at night). Similarly, Daft Punk is a nighttime favorite as well. As for the daytime, indie pop/rock bands such as Vampire Weekend and Phantogram are apparently more popular.
 
@@ -55,15 +52,15 @@ What about individual artists? What songs of them were getting played exactly? B
 
 Starting with Beck (note only the top 10 songs of his are shown):
 
-[![Screen Shot 2014-08-18 at 7.42.43 PM](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.42.43-PM-1024x590.png)](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.42.43-PM.png)
+<img src="https://raw.githubusercontent.com/Runze/kcrw/master/screenshot_beck.png" alt="alt text" width="700">
 
 Looking at this chart, I can finally see why he was consistently ranked the highest: whenever one of his songs fell out of favor, almost immediately another song would catch up. I should really start to listen to him more.
 
 Let's look at another artist: Lorde. Although not among the top 20, she was ranked 26.
 
-[![Screen Shot 2014-08-18 at 7.42.58 PM](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.42.58-PM-1024x590.png)](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-08-18-at-7.42.58-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-06-22-at-12.12.41-PM.png)[
-](http://www.runzemc.com/wp-content/uploads/2014/06/Screen-Shot-2014-06-21-at-8.59.18-PM.png)Interestingly, after Royals had an impressive debut in May 2013, it quickly dropped but rebounded again in August. I wonder if that was around the time when she was recognized by the mass, or maybe it was with the help of the Magnifik Remix that peaked in July (which, in my humble opinion, is pretty awful, especially given the original was so good). I'm a little sad that 400 Lux and Tennis Court did not get as many plays though.
+<img src="https://raw.githubusercontent.com/Runze/kcrw/master/screenshot_lorde.png" alt="alt text" width="700">
+
+Interestingly, after Royals had an impressive debut in May 2013, it quickly dropped but rebounded again in August. I wonder if that was around the time when she was recognized by the mass, or maybe it was with the help of the Magnifik Remix that peaked in July (which, in my humble opinion, is pretty awful, especially given the original was so good). I'm a little sad that 400 Lux and Tennis Court did not get as many plays though.
 
 **Conclusion and Future Work**
 
