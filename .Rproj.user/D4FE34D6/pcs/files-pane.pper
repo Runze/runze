@@ -1,9 +1,13 @@
 {
-    "path" : "~/Documents/Github/blog",
+    "path" : "~/Documents/blog/content/post",
     "sortOrder" : [
         {
-            "ascending" : true,
+            "ascending" : false,
             "columnIndex" : 2
+        },
+        {
+            "ascending" : false,
+            "columnIndex" : 4
         }
     ]
 }
