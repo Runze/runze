@@ -1,4 +1,4 @@
-baseurl = "https://runze.github.io"
+baseurl = "/"
 relativeurls = true
 languageCode = "en-us"
 title = "An analysis of random things"
