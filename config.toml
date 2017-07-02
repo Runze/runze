@@ -4,7 +4,6 @@ languageCode = "en-us"
 title = "An analysis of random things"
 theme = "blackburn"
 googleAnalytics = ""
-disqusShortname = "runzewang"
 ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
 
 [permalinks]
@@ -41,7 +40,9 @@ ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
 
     MathJaxCDN = "//cdn.bootcss.com"
     MathJaxVersion = "2.7.1"
-
+    
+     disqus = "runze-ds-blog"
+    
     [params.logo]
     url = "Puppy.jpg"
     width = 50
