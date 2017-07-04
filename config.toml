@@ -41,11 +41,7 @@ ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
     MathJaxCDN = "//cdn.bootcss.com"
     MathJaxVersion = "2.7.1"
     
-     disqus = "runze-ds-blog"
+    disqus = "runze-ds-blog"
     
-    [params.logo]
-    url = "Puppy.jpg"
-    width = 50
-    height = 50
-    alt = "Logo"
-
+    dateFormat = "2006-01-02"
+    
