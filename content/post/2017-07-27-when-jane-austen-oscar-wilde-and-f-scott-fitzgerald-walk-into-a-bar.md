@@ -12,7 +12,6 @@ tags:
   - NLP
 description: ''
 topics: []
-images: ["/images/rnn_illustration.png"]
 ---
 
 ### Background
