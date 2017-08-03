@@ -156,12 +156,24 @@ log(x) &amp; \quad \text{if $\lambda$ = 0}
 </ul></li>
 </ul></li>
 </ul>
-<pre class="r"><code>suppressMessages(library(dplyr))
-suppressMessages(library(quantmod))
-suppressMessages(library(lmtest))
+<pre class="r"><code>suppressMessages(library(dplyr))</code></pre>
+<pre><code>## Warning: package &#39;dplyr&#39; was built under R version 3.3.2</code></pre>
+<pre><code>## Warning: Installed Rcpp (0.12.12) different from Rcpp used to build dplyr (0.12.11).
+## Please reinstall dplyr to avoid random crashes or undefined behavior.</code></pre>
+<pre class="r"><code>suppressMessages(library(quantmod))</code></pre>
+<pre><code>## Warning: package &#39;quantmod&#39; was built under R version 3.3.2</code></pre>
+<pre><code>## Warning: package &#39;xts&#39; was built under R version 3.3.2</code></pre>
+<pre><code>## Warning: package &#39;TTR&#39; was built under R version 3.3.2</code></pre>
+<pre class="r"><code>suppressMessages(library(lmtest))
 options(&#39;getSymbols.warning4.0&#39; = F)
 
 getSymbols(&#39;AAPL&#39;)</code></pre>
+<pre><code>## 
+## WARNING: There have been significant changes to Yahoo Finance data.
+## Please see the Warning section of &#39;?getSymbols.yahoo&#39; for details.
+## 
+## This message is shown once per session and may be disabled by setting
+## options(&quot;getSymbols.yahoo.warning&quot;=FALSE).</code></pre>
 <pre><code>## [1] &quot;AAPL&quot;</code></pre>
 <pre class="r"><code>aapl = data.frame(AAPL)
 aapl$date = row.names(aapl)
@@ -170,6 +182,9 @@ aapl$aapl_ret = c(NA, aapl_return)
 aapl = select(aapl, date, aapl_ret)
 
 getSymbols(&#39;SPX&#39;)</code></pre>
+<pre><code>## Warning: SPX contains missing values. Some functions will not work if
+## objects contain missing values in the middle of the series. Consider using
+## na.omit(), na.approx(), na.fill(), etc to remove or replace them.</code></pre>
 <pre><code>## [1] &quot;SPX&quot;</code></pre>
 <pre class="r"><code>spx = data.frame(SPX)
 spx$date = row.names(spx)
@@ -178,8 +193,9 @@ spx$spx_ret = c(NA, spx_return)
 spx = select(spx, date, spx_ret)
 
 returns = inner_join(x = aapl, y = spx, by = &#39;date&#39;)
-returns = filter(returns, date &gt;= as.Date(&#39;2012-01-01&#39;))
-model = lm(aapl_ret ~ spx_ret, data = returns)
+returns = filter(returns, date &gt;= as.Date(&#39;2012-01-01&#39;))</code></pre>
+<pre><code>## Warning: package &#39;bindrcpp&#39; was built under R version 3.3.2</code></pre>
+<pre class="r"><code>model = lm(aapl_ret ~ spx_ret, data = returns)
 
 resid = residuals(model)
 plot.ts(resid)</code></pre>
@@ -191,7 +207,7 @@ plot.ts(resid)</code></pre>
 ##  Durbin-Watson test
 ## 
 ## data:  model
-## DW = 1.9756, p-value = 0.3906
+## DW = 1.9725, p-value = 0.3744
 ## alternative hypothesis: true autocorrelation is greater than 0</code></pre>
 <pre class="r"><code>par(mfrow = c(2, 2))
 plot(model)</code></pre>
