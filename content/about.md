@@ -13,4 +13,4 @@ I'm a data scientist, an avid language-learner, and a self-proclaimed art-lover.
 
 If you insist on knowing more, you can reach me at ernuzwang@gmail.com.
 
-Bye.
+à bientôt :-)
