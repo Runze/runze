@@ -332,7 +332,7 @@ for k, p in enumerate(predictions_in_words):
 # Translation of we need a new initiative from the commission on this : nous avons besoin de
 ```
 
-As you can see, in the first few single-word examples, the model was able to translate the word itself but it didn't know when to stop and still outputted random words afterwards. This is probably partially due to that I didn't have a clear stop signal for the model and padding a special end-of-sentence character in the training sequences may help.
+As you can see, in the first few single-word examples, the model was able to translate the word itself (e.g., "I" to "je") but it didn't know when to stop and still outputted random words afterwards. This is probably partially due to that I didn't have a clear stop signal for the model and padding a special end-of-sentence character in the training sequences may help.
 
 However, it couldn't get simple expressions like "hello" right. To be fair, the Europarl data I used for training does not have many examples that use interjections. In fact, there is no use of *bonjour* in the French sentences and, as for *hello* in English, there are only two sentences that include it and they were paired with "au revoir" (goodbye) and "saluer" (to say hello), respectively.[^longnote] On the contrary, there are over 6,000 sentences with the word "president" in it. Hence, this simple model's ability is somewhat limited by its training data and does not fair well with out-of-vocabulary inputs.
 
