@@ -1,0 +1,397 @@
+---
+title: Second attempt at building a language translator
+author: Runze
+date: '2017-09-07'
+slug: second-attempt-at-building-a-language-translator
+categories:
+  - Data Analysis
+tags:
+  - Deep Learning
+  - RNN
+  - LSTM
+  - NLP
+description: ''
+draft: yes
+topics: []
+---
+
+### Background
+
+A few weeks ago, I experimented with building [a language translator](https://runze.github.io/2017/08/14/first-attempt-at-building-a-language-translator/) using a simple sequence-to-sequence model. Since then, I had been itchy to add an extra attention layer to it that I had been reading so much about. After many, many research, I came across (quite accidentally) this MOOC [series](http://course.fast.ai/part2.html) offered by [fast.ai](http://www.fast.ai/), where on [Lesson 13](http://course.fast.ai/lessons/lesson13.html), instructor Jeremy Howard walked the students through a practical implementation of the attention mechanism using PyTorch. Given that PyTorch was another framework that I had yet to learn and knowing that it was not as high level as Keras, I was initially hesitant in following the tutorial. However, after seeing Jeremy demonstrate the superior flexibility and customization of PyTorch, I decided to roll up my sleeves and learn the framework. Yes, you can't just write a couple of lines of code to build an out-of-box model in PyTorch as you can in Keras, but PyTorch makes it easy to implement a new custom layer like attention.^[For a more detailed comparison between PyTorch and Keras, you can read about this [post](http://www.fast.ai/2017/09/08/introducing-pytorch-for-fastai/) by Jeremy and his decision to switch to PyTorch in his teaching.] That said, I still like and appreciate how elegantly and thoughtfully Keras is designed^[For example, I can't rave enough about how similar it is to Scikit-Learn, which I imagine is what deep learning framework will ultimately become.] and, now that [TensorFlow has chosen Keras](http://www.fast.ai/2017/01/03/keras/) to be the first high-level library added to its core framework, I have full confidence that it will only get better and overcome these limitations.
+
+The remainder of this post will walk through the key parts of the model building process and the results. My full code, heavily borrowed from Jeremy's [tutorial](https://github.com/fastai/courses/blob/master/deeplearning2/translate-pytorch.ipynb), is written in this [Jupyter Notebook](https://github.com/Runze/seq2seq-translation-attention/blob/master/translate.ipynb).
+
+### Attention layer
+
+First of all, let's get familiar with the attention mechanism. After reading many blog posts on the subject, I gained a pretty good intuition on the idea. For example, this [post](https://distill.pub/2016/augmented-rnns/) by Distill and its beautiful, interactive visualizations boils attention down to an extra layer between the encoder and decoder that, at a given time in the decoding stage, weights all the encoder outputs based on their relevance with the current decoder state, produces a weighted sum of them, and uses it as the input to the decoder. Compared to the old way that broadcasts the last encoder output to feed each of the many decoders (which I implemented in the previous blog [post](https://runze.github.io/2017/08/14/first-attempt-at-building-a-language-translator/)), this honestly makes more intuitive sense and feels less like a hack.
+
+Yet after reading these posts, I was still hazy about the implementation, so I decided to bite the bullet and go back to the original [paper](https://arxiv.org/abs/1409.0473) by Bahdanau et al., which was in fact surprisingly easy to understand. But I still needed to see some actual code and the implementation details, which is where Jeremy's tutorial helps the most. After reading through his code and writing my own, I illustrated my understandings below (using notations from Vinyals, et. al.'s paper [*Grammar as a Foreign Language*](https://arxiv.org/abs/1412.7449)):
+
+#### Weighting encoder outputs
+
+The first job of an attention layer is to weight each encoder output based on their relevance with the current decoder hidden state, which Bahdanau et al.'s paper descriptively calls the *allignment model*, and produces a weighted sum. This process is illustrated below:
+
+<img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/illustration_1.png" alt="alt text" width="700">
+
+To put it into words, the encoder layer, which is essentially a sequential model, takes each English word in a sentence as the input and produces a series of outputs denoted as $h_i$. To determine their relevance with the current decoder hidden state $d_t$, it computes an alignment function $u^t_i$ as a linear combination of the two (i.e., $u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)$), one for each encoder output. The higher the $u^t_i$, the more relevant the model thinks an encoder output is to the current decoder hidden state, and the more weight it places on it. To normalize the weights, it feeds these raw values to a softmax function to have them add up to 1.
+
+#### Computing decoder input
+
+After producing the weights for each encoder output, we compute a weighted sum $d_t'$ and concatenate it with the current decoder hidden state $d_t$ as the new input to the decoder model and make predictions based on that:
+
+<img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/illustration_2.png" alt="alt text" width="700">
+
+Note this is the implementation suggested by the paper (I think); in practice, I learned that people usually add *teacher-forcing* to the last concatenation of $d_t'$ and $d_t$. Specifically, instead of concatenating $d_t'$ with the previous decoder hidden state, we concatenate it with the previous target label, which is the ground truth translation. In the illustration above, if we were to use teacher-forcing, we would concatenate $d_t'$ with the french word *la* instead.^[Another implementation detail is that, because we give users the option to use the previous target label, which is usually in the form of a one-hot encoded vector, when we are not using teacher-forcing, to keep the format consistent, instead of using the previous hidden state as the paper suggested, we use the previous prediction output, also a one-hot encoded vector, which is essentially the previous hidden state fed to another linear layer.] The benefit of using teacher-forcing is that it makes the model train faster, but completely relying on it can lead to overfitting. Hence, in the training process, it's better to randomly use it at each iteration. In testing, obviously, we should always keep it off.
+
+#### Implementing encoder, decoder, and attention in PyTorch
+
+Since we are at it, let's look at the code that implements encoder, decoder, and the attention layer first, which is again generously borrowed from Jeremy's [tutorial](https://github.com/fastai/courses/blob/master/deeplearning2/translate-pytorch.ipynb)^[Except I used LSTM and the tutorial used GRU.] :-)
+
+```python
+# Create encoder RNN using LSTM
+class EncoderRNN(nn.Module):
+    def __init__(self, init_embeddings, hidden_size, n_layers=2):
+        super(EncoderRNN, self).__init__()
+        
+        self.embedding, vocab_size, embedding_size = create_embedding(init_embeddings)
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        self.lstm = nn.LSTM(embedding_size, hidden_size, n_layers, batch_first=True)
+        if use_cuda:
+            self.lstm = self.lstm.cuda()
+    
+    def forward(self, input, states):
+        output, states = self.lstm(self.embedding(input), states)
+        return output, states
+    
+    def initHidden(self, batch_size):
+        init_hidden_state = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
+        init_cell_state = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
+        
+        if use_cuda:
+            return (init_hidden_state.cuda(), init_cell_state.cuda())
+        else:
+            return (init_hidden_state, init_cell_state)
+```
+
+The code above implements the encoder, which is just a straightforward LSTM layer. Although there is a bunch of initiations, the core piece, `output, states = self.lstm(self.embedding(input), states)`, is defined in one line in the `forward` function, which is a special function in PyTorch that defines the computation performed at every call. As you can see, all it does here is feed the input, in a form of embedding vectors, and the initialized zero states to an LSTM layer. The input embeddings are created by applying pre-trained embeddings to the input in the embedding layer, which is created by calling a custom function `create_embedding` (more details on this later).
+
+The decoder is implemented as follows:
+
+```python
+class AttnDecoderRNN(nn.Module):
+    def __init__(self, init_embeddings, hidden_size, n_layers=2):
+        super(AttnDecoderRNN, self).__init__()
+        
+        self.embedding, vocab_size, embedding_size = create_embedding(init_embeddings)
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        
+        # Define weights and intercepts used in paper 1412.7449
+        # to construct the allignment matrix: u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)
+        self.W1 = param(hidden_size, hidden_size)
+        self.W2 = param(hidden_size, hidden_size)
+        self.b = param(hidden_size)
+        self.v = param(hidden_size)
+        
+        # Linear layer to reshape hidden state, concatenated with either the previous true label or prediction,
+        # back to the shape of hidden state
+        # As the new input to LSTM
+        self.new_input = nn.Linear(hidden_size + embedding_size, hidden_size)
+        
+        # LSTM layers using the new concatenated hidden state as the input
+        self.lstm = nn.LSTM(hidden_size, hidden_size, n_layers)
+        
+        # Linear layer to reshape data to the shape of output vocabulary
+        self.out = nn.Linear(hidden_size, vocab_size)
+        
+        if use_cuda:
+            self.new_input = self.new_input.cuda()
+            self.lstm = self.lstm.cuda()
+            self.out = self.out.cuda()
+    
+    def forward(self, input, states, encoder_outputs):
+        # u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)
+        W1h = dot(encoder_outputs, self.W1)            # (batch_size, seq_length, hidden_size)
+        hidden_state = states[0]                       # (n_layers, batch_size, hidden_size)
+        W2d = hidden_state[-1].mm(self.W2)             # (batch_size, hidden_size)
+        W1h_W2d = W1h + W2d.unsqueeze(1) + self.b      # (batch_size, seq_length, hidden_size)
+        tahn_W1h_W2d = F.tanh(W1h_W2d)                 # (batch_size, seq_length, hidden_size)
+        u = (tahn_W1h_W2d * self.v).sum(2)             # (batch_size, seq_length)
+        
+        # a^t_i = softmax(u^t_i)
+        a = F.softmax(u)                               # (batch_size, seq_length)
+        
+        # d_t' = \sum_i^{T_A} a^t_i h_i
+        encoder_outputs_weighted_sum = (a.unsqueeze(2) * encoder_outputs).sum(1)
+                                                       # (batch_size, hidden_size)
+        
+        # Concatenate with decoder input,
+        # which is either the previous true label or prediction
+        concat_input = torch.cat((encoder_outputs_weighted_sum, self.embedding(input)), 1)
+                                                       # (batch_size, hidden_size + embedding_size)
+        
+        # Reshape the concatenated input back to the shape of hidden state
+        reshaped_input = self.new_input(concat_input)  # (batch_size, hidden_size)
+        
+        # Feed the new input into the LSTM layer
+        output, states = self.lstm(reshaped_input.unsqueeze(0), states)
+        output = output.squeeze(0)                     # (batch_size, hidden_size)
+        
+        # Finally, feed to the output layer
+        output = self.out(output)                      # (batch_size, vocab_size)
+        output = F.log_softmax(output)                 # (batch_size, vocab_size)
+        
+        return output, states, a
+```
+
+This looks more involved on a first look and that's because we are implementing the attention mechanism from the ground up, as described by the paper and illustrated above. For example, in the `__init__` function, we define the weights and intercept used for the alignment model $u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)$ (i.e., `W1`, `W2`, `b` and `v`) and then in the `forward` function, we implement the calculation by applying `W1` and `W2` to `encoder_outputs` and the previous `hidden_state`, respectively. Hence, it is really just a direct replication and the only tricky part is to get all the operations and dimensions right, and there is no better way to do that than through interactive trial and error, which PyTorch makes very easy to do. Seriously, looking at the code itself is rather fruitless and the only way to understand and tweak it is to test it out line by line. To aid the understanding, I included the original equations and dimensions in the comment.
+
+In the `forward` function, it is worth noting that the `input` variable, designed to take a one-hot encoded vector, can be either the previous decoder prediction if we are not using teacher-forcing or the previous target label if we are.
+
+The two code snippets above defines the encoder and decoder classes. To create an instance of them, we do:
+
+```python
+encoder = EncoderRNN(X_embeddings, hidden_size, n_layers)
+decoder = AttnDecoderRNN(y_embeddings, hidden_size, n_layers)
+```
+
+Now having the main model structure out of the way, the remainder of this post will briefly go through the data processing and training functions.
+
+### Data processing
+
+Instead of reusing the European Parliament data as in the previous post, I decided to try a more practical dataset as suggested by this PyTorch [tutorial](http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html). The data comes from an open translation site http://tatoeba.org/ and is more close to everyday conversations.^[The tutorial provides this [link](https://download.pytorch.org/tutorial/data.zip) to download the data.] To further simplify the training, I only included sentences that are shorter than 20 words and start with "I", "you", "he", "she", or "we". As a standard procedure, I converted them to numerical indices, padded zeros in the end to make them of equal length, and separate them into training and testing sets. To save space, the code that does those is omitted here. The result is four word index matrices `X_id_padded_train`, `X_id_padded_test`, `y_id_padded_train`, and `y_id_padded_test` and four mapping dictionaries in both directions `X_word_to_id`, `X_id_to_word`, `y_word_to_id`, and `y_id_to_word`.
+
+To give our model a head start, we can apply pre-trained embeddings to the input. Again, thanks to Jeremy's tutorial, I downloaded and applied Stanford's [GloVe word vectors](https://nlp.stanford.edu/projects/glove/) for the English words and Jean-Philippe Fauconnier's [French word vectors](http://fauconnier.github.io/index.html) for the French words. The implementation is demonstrated below (assuming we have downloaded our embeddings into a folder called `data`):
+
+```python
+# English embeddings
+# Code stolen from https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
+embeddings_index_en = {}
+f = open('data/glove.6B/glove.6B.200d.txt')
+for line in f:
+    values = line.split()
+    word = values[0]
+    coefs = np.asarray(values[1:], dtype='float32')
+    embeddings_index_en[word] = coefs
+f.close()
+
+# French embeddings
+embeddings_index_fr = word2vec.KeyedVectors.load_word2vec_format(
+    'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', binary=True)
+```
+
+```python
+# Map words to pre-trained embeddings
+def map_word_to_pretrained_embedding(embeddings_index, embedding_size, word_to_id):
+    vocab_size = len(word_to_id)
+    embedding_matrix = np.zeros((vocab_size, embedding_size))
+    
+    # Keep a running count of matched words
+    found = 0
+    
+    for word, i in word_to_id.items():
+        if word in embeddings_index:
+            embedding_vector = embeddings_index[word]
+            embedding_matrix[i] = embedding_vector
+            found += 1
+        else:
+            # Words not found in embedding index will be randomly initialized
+            embedding_matrix[i] = np.random.normal(size=(embedding_size, ))
+
+    return embedding_matrix, found
+
+X_embeddings, X_found = map_word_to_pretrained_embedding(embeddings_index_en, 200, X_word_to_id)
+y_embeddings, y_found = map_word_to_pretrained_embedding(embeddings_index_fr, 200, y_word_to_id)
+```
+
+The results, `X_embeddings` and `y_embeddings` are two embedding matrices of shape `(vocab_size, embedding_size)` each. To create an embedding layer with one of these pre-defined embeddings as the initial weights, we define a `create_embedding` function like this:
+
+```python
+# Create a embedding layer initialized with pre-trained embedding matrix
+def create_embedding(init_embeddings):
+    vocab_size, embedding_size = init_embeddings.size()
+    embedding = nn.Embedding(vocab_size, embedding_size)
+    embedding.load_state_dict({'weight': init_embeddings})
+    
+    if use_cuda:
+        embedding = embedding.cuda()
+    
+    return embedding, vocab_size, embedding_size
+```
+
+Note, because we did not fix the embedding values by setting `requires_grad = False`, we allow the model to update them based on the loss function just as it will do to any parameters.
+
+### Model training
+
+After having our input ready and model defined, we are ready to write a training function to feed the input into the model and compute and minimize the loss function. This is defined as follows:
+
+```python
+def train(X_input, y_input, encoder, decoder, encoder_optimizer,
+          decoder_optimizer, criterion, teacher_forcing_prob=0.5):
+    # Initialize variables
+    batch_size, X_seq_length = X_input.size()
+    y_seq_length = y_input.size()[1]
+    
+    encoder_states = encoder.initHidden(batch_size)
+    decoder_input = Variable(torch.LongTensor([X_word_to_id['GO']] * batch_size))
+    if use_cuda:
+        decoder_input = decoder_input.cuda()
+
+    encoder_optimizer.zero_grad()
+    decoder_optimizer.zero_grad()
+    loss = 0
+
+    # Encode
+    encoder_outputs, encoder_states = encoder(X_input, encoder_states)
+    decoder_states = encoder_states
+
+    # Decode
+    if np.random.random() <= teacher_forcing_prob:
+        # Teacher forcing: use the true label as the next decoder input
+        for i in range(y_seq_length):
+            decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+            loss += criterion(decoder_output, y_input[:, i])
+            decoder_input = y_input[:, i]
+    else:
+        # Otherwise, use the previous prediction
+        for i in range(y_seq_length):
+            decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+            loss += criterion(decoder_output, y_input[:, i])
+            
+            # Generate prediction
+            top_value, top_index = decoder_output.data.topk(1)
+            decoder_input = Variable(top_index.squeeze(1))
+            if use_cuda:
+                decoder_input = decoder_input.cuda()
+    
+    loss.backward()
+    encoder_optimizer.step()
+    decoder_optimizer.step()
+    
+    return loss.data[0] / y_seq_length
+```
+
+Unlike Keras, PyTorch requires us to write out some ground work such as initializing the optimizers and triggering backpropagation. Taking them out, we can see the essential part for encoding is as simple as `encoder_outputs, encoder_states = encoder(X_input, encoder_states)`.
+
+For decoding, it is a bit more involved because, first of all, we need to write it in a `for` loop because the attention is computed on a per-output basis and, second, we want to implement teacher-forcing randomly. In the snippet above, the randomization is controlled by a pre-defined ratio specifying the number of time we want to use this technique, which is inspired by this PyTorch [tutorial](http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html), but it's certainly not the only way of doing so. For example, one can also gradually decrease the ratio as training proceeds.
+
+If we use teacher-forcing for the current iteration, `decoder_input` is the previous label `y_input[:, i]`;^[Note `decoder_input` is initialized to be a special `GO` character.] if we don't, it would be the previous prediction `decoder_output.data.topk(1)`, just as we described above.
+
+Since we just defined the training function, let's also write out the test function, which is essentially a training function without a loss function or teacher-forcing. In addition to return the prediction outputs, I also had it return the attention matrices for visualization and debugging purposes:
+
+```python
+def evaluate(X_input, encoder, decoder, max_len):
+    # Initialize variables
+    batch_size, X_seq_length = X_input.size()
+    
+    encoder_states = encoder.initHidden(batch_size)
+    decoder_input = Variable(torch.LongTensor([X_word_to_id['GO']] * batch_size))
+    if use_cuda:
+        decoder_input = decoder_input.cuda()
+    
+    # Encode
+    encoder_outputs, encoder_states = encoder(X_input, encoder_states)
+    decoder_states = encoder_states
+
+    # Decode
+    decoded_words = np.zeros((batch_size, max_len))
+    decoder_attentions = np.zeros((batch_size, max_len, max_len))
+    
+    for i in range(max_len):
+        decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+        
+        # Generate prediction
+        top_value, top_index = decoder_output.data.topk(1)
+        decoded_words[:, i] = top_index.squeeze(1).cpu().numpy()
+        decoder_attentions[:, i, :] = decoder_attention.data.cpu().numpy()
+        
+        # Use the prediction as the next decoder input
+        decoder_input = Variable(top_index.squeeze(1))
+        if use_cuda:
+            decoder_input = decoder_input.cuda()
+    
+    return decoded_words, decoder_attentions
+```
+
+Finally, we are ready to put them all together and train for a number of epochs. First, I defined all the hyperparameters, initialized the encoder, decoder, and their optimizers, as well as the loss functions as follows:
+
+```python
+epochs = 60
+max_len = 20
+batch_size = 100
+hidden_size = 200
+learning_rate = 0.005
+teacher_forcing_prob = 0.5
+
+encoder = EncoderRNN(X_embeddings, hidden_sizem)
+decoder = AttnDecoderRNN(y_embeddings, hidden_size)
+
+encoder_optimizer = optim.RMSprop(encoder.parameters(), lr=learning_rate)
+decoder_optimizer = optim.RMSprop(decoder.parameters(), lr=learning_rate)
+
+criterion = nn.NLLLoss()
+if use_cuda:
+    criterion = criterion.cuda()
+```
+
+Next, I wrote a `for` loop to go over the training data `epochs` number of times and prints out the progress (including the loss and the translations of test sentences):
+
+```python
+for i in range(epochs):
+    print('Epoch:', i)
+    
+    # Shuffle the training data every epoch to avoid local minima
+    np.random.seed(i)
+    ix = np.arange(len(X_id_padded_train))
+    np.random.shuffle(ix)
+    
+    X_id_padded_train, y_id_padded_train = X_id_padded_train[ix], y_id_padded_train[ix]
+    
+    # Train an epoch
+    train_loss = train_epoch(X_id_padded_train, y_id_padded_train, batch_size,
+                             encoder, decoder, encoder_optimizer,
+                             decoder_optimizer, criterion, teacher_forcing_prob)
+    
+    print('\nTraining loss:', train_loss)
+    
+    # Evaluate
+    # Translate test sentences
+    input_sentences, target_sentences, output_sentences, decoder_attentions = translate_tests(X_test, y_test)
+    
+    for j in range(len(input_sentences)):
+        print('\nTranslation of', input_sentences[j], ':', output_sentences[j])
+        print('Actual translation:', target_sentences[j])
+```
+
+There are two wrapper functions that I did not mention above: `train_epoch` calls the `train` function `len(X) // batch_size` number of times to go through the entire training data once and `translate_tests` simply cleans the output of `evaluate` by converting them back to sentences. You can find them, along with the other code, in my [notebook](https://github.com/Runze/seq2seq-translation-attention/blob/master/translate.ipynb).
+
+### Model testing
+
+The most exciting moment arrived - let's see how the model performs! To test its translation ability, I randomly sampled a bunch of English sentences from the test set with various lengths and fed them into the model. The results, along with my manual assessment (1 means correct) and commentary,^[Yes, my French is good enough to evaluate the translation quality.] are presented in the table below, sorted by the length of the English sentences:
+
+```{r, message=FALSE, warning=FALSE}
+library(DT)
+library(tidyverse)
+test_translations = read_csv('test_translations.csv')
+datatable(test_translations)
+```
+
+Although it only gets 20% of the test sentences correct,^[Some of the mistranslations are rather funny. For example, it translates "we shared everything" to "nous avons tout perdu", which means we lost everything.] I'm still rather impressed with the quality, especially with long sentences and tricky grammar points. For example, I'm quite proud that it aptly translates No. 60 "i knew we were going to get married the moment i met you" to "je savais que nous allions nous marier au moment où je t'ai rencontré" - it gets both the subjunctive tense *nous allions* and the reflexive verb *se marier* correct!
+
+Overall, the trend is that it has more trouble with longer sentences, which may either be due to the model itself or the lack of long sentences in the training data to start with.^[Most of the sentences in the training data are within 10 words.] If the latter plays a bigger part, I wonder if my limitation of the training data to those that start with a pronoun actually hurt the model performance - I'll experiment with more sentences in the future. Regardless, compared with my first attempt which was only able to correctly translate the first few words, this is certainly a step-up.^[Although I was using a more complicated dataset, EuroParl, in the previous experiment, so it's not clear how much the improvement is due to the model itself unless I reuse the same dataset in the new model.]
+
+### Next steps
+
+After implementing the attention mechanism by following Jeremy's tutorial, I am interested in exploring other implementations and extensions. For example, this PyTorch [tutorial](http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html) does it slightly differently in that it uses teacher-forcing in both constructing the alignment function and concatenating the weighted sum (whereas in the tutorial I followed and implemented, the technique is only used in the latter). Doing so may further speed up the convergence.
+
+Another thing that I want to investigate further is the attention weights themselves. When trying to visualize them, I did not see a clear diagonal pattern as Bahdanau et al. presented in their paper. In fact, the pattern I found is rather random and sometimes highlights the zero paddings. I wonder if it's because of of my implementation or because I didn't train it long enough. However, even the correct translations don't exhibit a diagonal alignment, which still puzzles me. I wonder if, instead of padding all sentences to the maximum length, using a more compact padding scheme like [bucketing](https://www.tensorflow.org/tutorials/seq2seq#bucketing_and_padding) will help. Theoretically, the model should eventually learn to ignore the zero paddings but reducing the amount of paddings should help it focus better. Maybe one day it will be good enough to correctly translate "he is likely to have a book and a cracker at his meals and then forget to eat the cracker" (the last sentence in the table above) while figuring out what he eats instead.
+
+### References
+
+Dzmitry Bahdanau,Kyunghyun Cho,and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. *arXiv preprint arXiv:1409.0473*, 2014.
+
+Vinyals, O., L. Kaiser, T. Koo, S. Petrov, I. Sutskever & G. E. Hinton (2014). Grammar
+as a foreign language. *CoRR, abs/1412.7449.*
+
+Jeremy Howard, Rachel Thomas. [fast.ai](http://www.fast.ai/) Lesson 13 - Neural Translation. http://course.fast.ai/lessons/lesson13.html

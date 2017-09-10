@@ -1,0 +1,362 @@
+---
+title: Second attempt at building a language translator
+author: Runze
+date: '2017-09-07'
+slug: second-attempt-at-building-a-language-translator
+categories:
+  - Data Analysis
+tags:
+  - Deep Learning
+  - RNN
+  - LSTM
+  - NLP
+description: ''
+draft: yes
+topics: []
+---
+
+<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
+<script src="/rmarkdown-libs/jquery/jquery.min.js"></script>
+<script src="/rmarkdown-libs/datatables-binding/datatables.js"></script>
+<link href="/rmarkdown-libs/dt-core/css/jquery.dataTables.min.css" rel="stylesheet" />
+<link href="/rmarkdown-libs/dt-core/css/jquery.dataTables.extra.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/dt-core/js/jquery.dataTables.min.js"></script>
+
+
+<div id="background" class="section level3">
+<h3>Background</h3>
+<p>A few weeks ago, I experimented with building <a href="https://runze.github.io/2017/08/14/first-attempt-at-building-a-language-translator/">a language translator</a> using a simple sequence-to-sequence model. Since then, I had been itchy to add an extra attention layer to it that I had been reading so much about. After many, many research, I came across (quite accidentally) this MOOC <a href="http://course.fast.ai/part2.html">series</a> offered by <a href="http://www.fast.ai/">fast.ai</a>, where on <a href="http://course.fast.ai/lessons/lesson13.html">Lesson 13</a>, instructor Jeremy Howard walked the students through a practical implementation of the attention mechanism using PyTorch. Given that PyTorch was another framework that I had yet to learn and knowing that it was not as high level as Keras, I was initially hesitant in following the tutorial. However, after seeing Jeremy demonstrate the superior flexibility and customization of PyTorch, I decided to roll up my sleeves and learn the framework. Yes, you can’t just write a couple of lines of code to build an out-of-box model in PyTorch as you can in Keras, but PyTorch makes it easy to implement a new custom layer like attention.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> That said, I still like and appreciate how elegantly and thoughtfully Keras is designed<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> and, now that <a href="http://www.fast.ai/2017/01/03/keras/">TensorFlow has chosen Keras</a> to be the first high-level library added to its core framework, I have full confidence that it will only get better and overcome these limitations.</p>
+<p>The remainder of this post will walk through the key parts of the model building process and the results. My full code, heavily borrowed from Jeremy’s <a href="https://github.com/fastai/courses/blob/master/deeplearning2/translate-pytorch.ipynb">tutorial</a>, is written in this <a href="https://github.com/Runze/seq2seq-translation-attention/blob/master/translate.ipynb">Jupyter Notebook</a>.</p>
+</div>
+<div id="attention-layer" class="section level3">
+<h3>Attention layer</h3>
+<p>First of all, let’s get familiar with the attention mechanism. After reading many blog posts on the subject, I gained a pretty good intuition on the idea. For example, this <a href="https://distill.pub/2016/augmented-rnns/">post</a> by Distill and its beautiful, interactive visualizations boils attention down to an extra layer between the encoder and decoder that, at a given time in the decoding stage, weights all the encoder outputs based on their relevance with the current decoder state, produces a weighted sum of them, and uses it as the input to the decoder. Compared to the old way that broadcasts the last encoder output to feed each of the many decoders (which I implemented in the previous blog <a href="https://runze.github.io/2017/08/14/first-attempt-at-building-a-language-translator/">post</a>), this honestly makes more intuitive sense and feels less like a hack.</p>
+<p>Yet after reading these posts, I was still hazy about the implementation, so I decided to bite the bullet and go back to the original <a href="https://arxiv.org/abs/1409.0473">paper</a> by Bahdanau et al., which was in fact surprisingly easy to understand. But I still needed to see some actual code and the implementation details, which is where Jeremy’s tutorial helps the most. After reading through his code and writing my own, I illustrated my understandings below (using notations from Vinyals, et. al.’s paper <a href="https://arxiv.org/abs/1412.7449"><em>Grammar as a Foreign Language</em></a>):</p>
+<div id="weighting-encoder-outputs" class="section level4">
+<h4>Weighting encoder outputs</h4>
+<p>The first job of an attention layer is to weight each encoder output based on their relevance with the current decoder hidden state, which Bahdanau et al.’s paper descriptively calls the <em>allignment model</em>, and produces a weighted sum. This process is illustrated below:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/illustration_1.png" alt="alt text" width="700"></p>
+<p>To put it into words, the encoder layer, which is essentially a sequential model, takes each English word in a sentence as the input and produces a series of outputs denoted as <span class="math inline">\(h_i\)</span>. To determine their relevance with the current decoder hidden state <span class="math inline">\(d_t\)</span>, it computes an alignment function <span class="math inline">\(u^t_i\)</span> as a linear combination of the two (i.e., <span class="math inline">\(u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)\)</span>), one for each encoder output. The higher the <span class="math inline">\(u^t_i\)</span>, the more relevant the model thinks an encoder output is to the current decoder hidden state, and the more weight it places on it. To normalize the weights, it feeds these raw values to a softmax function to have them add up to 1.</p>
+</div>
+<div id="computing-decoder-input" class="section level4">
+<h4>Computing decoder input</h4>
+<p>After producing the weights for each encoder output, we compute a weighted sum <span class="math inline">\(d_t&#39;\)</span> and concatenate it with the current decoder hidden state <span class="math inline">\(d_t\)</span> as the new input to the decoder model and make predictions based on that:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/illustration_2.png" alt="alt text" width="700"></p>
+<p>Note this is the implementation suggested by the paper (I think); in practice, I learned that people usually add <em>teacher-forcing</em> to the last concatenation of <span class="math inline">\(d_t&#39;\)</span> and <span class="math inline">\(d_t\)</span>. Specifically, instead of concatenating <span class="math inline">\(d_t&#39;\)</span> with the previous decoder hidden state, we concatenate it with the previous target label, which is the ground truth translation. In the illustration above, if we were to use teacher-forcing, we would concatenate <span class="math inline">\(d_t&#39;\)</span> with the french word <em>la</em> instead.<a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a> The benefit of using teacher-forcing is that it makes the model train faster, but completely relying on it can lead to overfitting. Hence, in the training process, it’s better to randomly use it at each iteration. In testing, obviously, we should always keep it off.</p>
+</div>
+<div id="implementing-encoder-decoder-and-attention-in-pytorch" class="section level4">
+<h4>Implementing encoder, decoder, and attention in PyTorch</h4>
+<p>Since we are at it, let’s look at the code that implements encoder, decoder, and the attention layer first, which is again generously borrowed from Jeremy’s <a href="https://github.com/fastai/courses/blob/master/deeplearning2/translate-pytorch.ipynb">tutorial</a><a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> :-)</p>
+<pre class="python"><code># Create encoder RNN using LSTM
+class EncoderRNN(nn.Module):
+    def __init__(self, init_embeddings, hidden_size, n_layers=2):
+        super(EncoderRNN, self).__init__()
+        
+        self.embedding, vocab_size, embedding_size = create_embedding(init_embeddings)
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        self.lstm = nn.LSTM(embedding_size, hidden_size, n_layers, batch_first=True)
+        if use_cuda:
+            self.lstm = self.lstm.cuda()
+    
+    def forward(self, input, states):
+        output, states = self.lstm(self.embedding(input), states)
+        return output, states
+    
+    def initHidden(self, batch_size):
+        init_hidden_state = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
+        init_cell_state = Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))
+        
+        if use_cuda:
+            return (init_hidden_state.cuda(), init_cell_state.cuda())
+        else:
+            return (init_hidden_state, init_cell_state)</code></pre>
+<p>The code above implements the encoder, which is just a straightforward LSTM layer. Although there is a bunch of initiations, the core piece, <code>output, states = self.lstm(self.embedding(input), states)</code>, is defined in one line in the <code>forward</code> function, which is a special function in PyTorch that defines the computation performed at every call. As you can see, all it does here is feed the input, in a form of embedding vectors, and the initialized zero states to an LSTM layer. The input embeddings are created by applying pre-trained embeddings to the input in the embedding layer, which is created by calling a custom function <code>create_embedding</code> (more details on this later).</p>
+<p>The decoder is implemented as follows:</p>
+<pre class="python"><code>class AttnDecoderRNN(nn.Module):
+    def __init__(self, init_embeddings, hidden_size, n_layers=2):
+        super(AttnDecoderRNN, self).__init__()
+        
+        self.embedding, vocab_size, embedding_size = create_embedding(init_embeddings)
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        
+        # Define weights and intercepts used in paper 1412.7449
+        # to construct the allignment matrix: u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)
+        self.W1 = param(hidden_size, hidden_size)
+        self.W2 = param(hidden_size, hidden_size)
+        self.b = param(hidden_size)
+        self.v = param(hidden_size)
+        
+        # Linear layer to reshape hidden state, concatenated with either the previous true label or prediction,
+        # back to the shape of hidden state
+        # As the new input to LSTM
+        self.new_input = nn.Linear(hidden_size + embedding_size, hidden_size)
+        
+        # LSTM layers using the new concatenated hidden state as the input
+        self.lstm = nn.LSTM(hidden_size, hidden_size, n_layers)
+        
+        # Linear layer to reshape data to the shape of output vocabulary
+        self.out = nn.Linear(hidden_size, vocab_size)
+        
+        if use_cuda:
+            self.new_input = self.new_input.cuda()
+            self.lstm = self.lstm.cuda()
+            self.out = self.out.cuda()
+    
+    def forward(self, input, states, encoder_outputs):
+        # u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)
+        W1h = dot(encoder_outputs, self.W1)            # (batch_size, seq_length, hidden_size)
+        hidden_state = states[0]                       # (n_layers, batch_size, hidden_size)
+        W2d = hidden_state[-1].mm(self.W2)             # (batch_size, hidden_size)
+        W1h_W2d = W1h + W2d.unsqueeze(1) + self.b      # (batch_size, seq_length, hidden_size)
+        tahn_W1h_W2d = F.tanh(W1h_W2d)                 # (batch_size, seq_length, hidden_size)
+        u = (tahn_W1h_W2d * self.v).sum(2)             # (batch_size, seq_length)
+        
+        # a^t_i = softmax(u^t_i)
+        a = F.softmax(u)                               # (batch_size, seq_length)
+        
+        # d_t&#39; = \sum_i^{T_A} a^t_i h_i
+        encoder_outputs_weighted_sum = (a.unsqueeze(2) * encoder_outputs).sum(1)
+                                                       # (batch_size, hidden_size)
+        
+        # Concatenate with decoder input,
+        # which is either the previous true label or prediction
+        concat_input = torch.cat((encoder_outputs_weighted_sum, self.embedding(input)), 1)
+                                                       # (batch_size, hidden_size + embedding_size)
+        
+        # Reshape the concatenated input back to the shape of hidden state
+        reshaped_input = self.new_input(concat_input)  # (batch_size, hidden_size)
+        
+        # Feed the new input into the LSTM layer
+        output, states = self.lstm(reshaped_input.unsqueeze(0), states)
+        output = output.squeeze(0)                     # (batch_size, hidden_size)
+        
+        # Finally, feed to the output layer
+        output = self.out(output)                      # (batch_size, vocab_size)
+        output = F.log_softmax(output)                 # (batch_size, vocab_size)
+        
+        return output, states, a</code></pre>
+<p>This looks more involved on a first look and that’s because we are implementing the attention mechanism from the ground up, as described by the paper and illustrated above. For example, in the <code>__init__</code> function, we define the weights and intercept used for the alignment model <span class="math inline">\(u^t_i = v^T tanh(W_1′ h_i + W_2′ d_t)\)</span> (i.e., <code>W1</code>, <code>W2</code>, <code>b</code> and <code>v</code>) and then in the <code>forward</code> function, we implement the calculation by applying <code>W1</code> and <code>W2</code> to <code>encoder_outputs</code> and the previous <code>hidden_state</code>, respectively. Hence, it is really just a direct replication and the only tricky part is to get all the operations and dimensions right, and there is no better way to do that than through interactive trial and error, which PyTorch makes very easy to do. Seriously, looking at the code itself is rather fruitless and the only way to understand and tweak it is to test it out line by line. To aid the understanding, I included the original equations and dimensions in the comment.</p>
+<p>In the <code>forward</code> function, it is worth noting that the <code>input</code> variable, designed to take a one-hot encoded vector, can be either the previous decoder prediction if we are not using teacher-forcing or the previous target label if we are.</p>
+<p>The two code snippets above defines the encoder and decoder classes. To create an instance of them, we do:</p>
+<pre class="python"><code>encoder = EncoderRNN(X_embeddings, hidden_size, n_layers)
+decoder = AttnDecoderRNN(y_embeddings, hidden_size, n_layers)</code></pre>
+<p>Now having the main model structure out of the way, the remainder of this post will briefly go through the data processing and training functions.</p>
+</div>
+</div>
+<div id="data-processing" class="section level3">
+<h3>Data processing</h3>
+<p>Instead of reusing the European Parliament data as in the previous post, I decided to try a more practical dataset as suggested by this PyTorch <a href="http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html">tutorial</a>. The data comes from an open translation site <a href="http://tatoeba.org/" class="uri">http://tatoeba.org/</a> and is more close to everyday conversations.<a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> To further simplify the training, I only included sentences that are shorter than 20 words and start with “I”, “you”, “he”, “she”, or “we”. As a standard procedure, I converted them to numerical indices, padded zeros in the end to make them of equal length, and separate them into training and testing sets. To save space, the code that does those is omitted here. The result is four word index matrices <code>X_id_padded_train</code>, <code>X_id_padded_test</code>, <code>y_id_padded_train</code>, and <code>y_id_padded_test</code> and four mapping dictionaries in both directions <code>X_word_to_id</code>, <code>X_id_to_word</code>, <code>y_word_to_id</code>, and <code>y_id_to_word</code>.</p>
+<p>To give our model a head start, we can apply pre-trained embeddings to the input. Again, thanks to Jeremy’s tutorial, I downloaded and applied Stanford’s <a href="https://nlp.stanford.edu/projects/glove/">GloVe word vectors</a> for the English words and Jean-Philippe Fauconnier’s <a href="http://fauconnier.github.io/index.html">French word vectors</a> for the French words. The implementation is demonstrated below (assuming we have downloaded our embeddings into a folder called <code>data</code>):</p>
+<pre class="python"><code># English embeddings
+# Code stolen from https://blog.keras.io/using-pre-trained-word-embeddings-in-a-keras-model.html
+embeddings_index_en = {}
+f = open(&#39;data/glove.6B/glove.6B.200d.txt&#39;)
+for line in f:
+    values = line.split()
+    word = values[0]
+    coefs = np.asarray(values[1:], dtype=&#39;float32&#39;)
+    embeddings_index_en[word] = coefs
+f.close()
+
+# French embeddings
+embeddings_index_fr = word2vec.KeyedVectors.load_word2vec_format(
+    &#39;data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin&#39;, binary=True)</code></pre>
+<pre class="python"><code># Map words to pre-trained embeddings
+def map_word_to_pretrained_embedding(embeddings_index, embedding_size, word_to_id):
+    vocab_size = len(word_to_id)
+    embedding_matrix = np.zeros((vocab_size, embedding_size))
+    
+    # Keep a running count of matched words
+    found = 0
+    
+    for word, i in word_to_id.items():
+        if word in embeddings_index:
+            embedding_vector = embeddings_index[word]
+            embedding_matrix[i] = embedding_vector
+            found += 1
+        else:
+            # Words not found in embedding index will be randomly initialized
+            embedding_matrix[i] = np.random.normal(size=(embedding_size, ))
+
+    return embedding_matrix, found
+
+X_embeddings, X_found = map_word_to_pretrained_embedding(embeddings_index_en, 200, X_word_to_id)
+y_embeddings, y_found = map_word_to_pretrained_embedding(embeddings_index_fr, 200, y_word_to_id)</code></pre>
+<p>The results, <code>X_embeddings</code> and <code>y_embeddings</code> are two embedding matrices of shape <code>(vocab_size, embedding_size)</code> each. To create an embedding layer with one of these pre-defined embeddings as the initial weights, we define a <code>create_embedding</code> function like this:</p>
+<pre class="python"><code># Create a embedding layer initialized with pre-trained embedding matrix
+def create_embedding(init_embeddings):
+    vocab_size, embedding_size = init_embeddings.size()
+    embedding = nn.Embedding(vocab_size, embedding_size)
+    embedding.load_state_dict({&#39;weight&#39;: init_embeddings})
+    
+    if use_cuda:
+        embedding = embedding.cuda()
+    
+    return embedding, vocab_size, embedding_size</code></pre>
+<p>Note, because we did not fix the embedding values by setting <code>requires_grad = False</code>, we allow the model to update them based on the loss function just as it will do to any parameters.</p>
+</div>
+<div id="model-training" class="section level3">
+<h3>Model training</h3>
+<p>After having our input ready and model defined, we are ready to write a training function to feed the input into the model and compute and minimize the loss function. This is defined as follows:</p>
+<pre class="python"><code>def train(X_input, y_input, encoder, decoder, encoder_optimizer,
+          decoder_optimizer, criterion, teacher_forcing_prob=0.5):
+    # Initialize variables
+    batch_size, X_seq_length = X_input.size()
+    y_seq_length = y_input.size()[1]
+    
+    encoder_states = encoder.initHidden(batch_size)
+    decoder_input = Variable(torch.LongTensor([X_word_to_id[&#39;GO&#39;]] * batch_size))
+    if use_cuda:
+        decoder_input = decoder_input.cuda()
+
+    encoder_optimizer.zero_grad()
+    decoder_optimizer.zero_grad()
+    loss = 0
+
+    # Encode
+    encoder_outputs, encoder_states = encoder(X_input, encoder_states)
+    decoder_states = encoder_states
+
+    # Decode
+    if np.random.random() &lt;= teacher_forcing_prob:
+        # Teacher forcing: use the true label as the next decoder input
+        for i in range(y_seq_length):
+            decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+            loss += criterion(decoder_output, y_input[:, i])
+            decoder_input = y_input[:, i]
+    else:
+        # Otherwise, use the previous prediction
+        for i in range(y_seq_length):
+            decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+            loss += criterion(decoder_output, y_input[:, i])
+            
+            # Generate prediction
+            top_value, top_index = decoder_output.data.topk(1)
+            decoder_input = Variable(top_index.squeeze(1))
+            if use_cuda:
+                decoder_input = decoder_input.cuda()
+    
+    loss.backward()
+    encoder_optimizer.step()
+    decoder_optimizer.step()
+    
+    return loss.data[0] / y_seq_length</code></pre>
+<p>Unlike Keras, PyTorch requires us to write out some ground work such as initializing the optimizers and triggering backpropagation. Taking them out, we can see the essential part for encoding is as simple as <code>encoder_outputs, encoder_states = encoder(X_input, encoder_states)</code>.</p>
+<p>For decoding, it is a bit more involved because, first of all, we need to write it in a <code>for</code> loop because the attention is computed on a per-output basis and, second, we want to implement teacher-forcing randomly. In the snippet above, the randomization is controlled by a pre-defined ratio specifying the number of time we want to use this technique, which is inspired by this PyTorch <a href="http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html">tutorial</a>, but it’s certainly not the only way of doing so. For example, one can also gradually decrease the ratio as training proceeds.</p>
+<p>If we use teacher-forcing for the current iteration, <code>decoder_input</code> is the previous label <code>y_input[:, i]</code>;<a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> if we don’t, it would be the previous prediction <code>decoder_output.data.topk(1)</code>, just as we described above.</p>
+<p>Since we just defined the training function, let’s also write out the test function, which is essentially a training function without a loss function or teacher-forcing. In addition to return the prediction outputs, I also had it return the attention matrices for visualization and debugging purposes:</p>
+<pre class="python"><code>def evaluate(X_input, encoder, decoder, max_len):
+    # Initialize variables
+    batch_size, X_seq_length = X_input.size()
+    
+    encoder_states = encoder.initHidden(batch_size)
+    decoder_input = Variable(torch.LongTensor([X_word_to_id[&#39;GO&#39;]] * batch_size))
+    if use_cuda:
+        decoder_input = decoder_input.cuda()
+    
+    # Encode
+    encoder_outputs, encoder_states = encoder(X_input, encoder_states)
+    decoder_states = encoder_states
+
+    # Decode
+    decoded_words = np.zeros((batch_size, max_len))
+    decoder_attentions = np.zeros((batch_size, max_len, max_len))
+    
+    for i in range(max_len):
+        decoder_output, decoder_states, decoder_attention = decoder(decoder_input, decoder_states, encoder_outputs)
+        
+        # Generate prediction
+        top_value, top_index = decoder_output.data.topk(1)
+        decoded_words[:, i] = top_index.squeeze(1).cpu().numpy()
+        decoder_attentions[:, i, :] = decoder_attention.data.cpu().numpy()
+        
+        # Use the prediction as the next decoder input
+        decoder_input = Variable(top_index.squeeze(1))
+        if use_cuda:
+            decoder_input = decoder_input.cuda()
+    
+    return decoded_words, decoder_attentions</code></pre>
+<p>Finally, we are ready to put them all together and train for a number of epochs. First, I defined all the hyperparameters, initialized the encoder, decoder, and their optimizers, as well as the loss functions as follows:</p>
+<pre class="python"><code>epochs = 60
+max_len = 20
+batch_size = 100
+hidden_size = 200
+learning_rate = 0.005
+teacher_forcing_prob = 0.5
+
+encoder = EncoderRNN(X_embeddings, hidden_sizem)
+decoder = AttnDecoderRNN(y_embeddings, hidden_size)
+
+encoder_optimizer = optim.RMSprop(encoder.parameters(), lr=learning_rate)
+decoder_optimizer = optim.RMSprop(decoder.parameters(), lr=learning_rate)
+
+criterion = nn.NLLLoss()
+if use_cuda:
+    criterion = criterion.cuda()</code></pre>
+<p>Next, I wrote a <code>for</code> loop to go over the training data <code>epochs</code> number of times and prints out the progress (including the loss and the translations of test sentences):</p>
+<pre class="python"><code>for i in range(epochs):
+    print(&#39;Epoch:&#39;, i)
+    
+    # Shuffle the training data every epoch to avoid local minima
+    np.random.seed(i)
+    ix = np.arange(len(X_id_padded_train))
+    np.random.shuffle(ix)
+    
+    X_id_padded_train, y_id_padded_train = X_id_padded_train[ix], y_id_padded_train[ix]
+    
+    # Train an epoch
+    train_loss = train_epoch(X_id_padded_train, y_id_padded_train, batch_size,
+                             encoder, decoder, encoder_optimizer,
+                             decoder_optimizer, criterion, teacher_forcing_prob)
+    
+    print(&#39;\nTraining loss:&#39;, train_loss)
+    
+    # Evaluate
+    # Translate test sentences
+    input_sentences, target_sentences, output_sentences, decoder_attentions = translate_tests(X_test, y_test)
+    
+    for j in range(len(input_sentences)):
+        print(&#39;\nTranslation of&#39;, input_sentences[j], &#39;:&#39;, output_sentences[j])
+        print(&#39;Actual translation:&#39;, target_sentences[j])</code></pre>
+<p>There are two wrapper functions that I did not mention above: <code>train_epoch</code> calls the <code>train</code> function <code>len(X) // batch_size</code> number of times to go through the entire training data once and <code>translate_tests</code> simply cleans the output of <code>evaluate</code> by converting them back to sentences. You can find them, along with the other code, in my <a href="https://github.com/Runze/seq2seq-translation-attention/blob/master/translate.ipynb">notebook</a>.</p>
+</div>
+<div id="model-testing" class="section level3">
+<h3>Model testing</h3>
+<p>The most exciting moment arrived - let’s see how the model performs! To test its translation ability, I randomly sampled a bunch of English sentences from the test set with various lengths and fed them into the model. The results, along with my manual assessment (1 means correct) and commentary,<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a> are presented in the table below, sorted by the length of the English sentences:</p>
+<pre class="r"><code>library(DT)
+library(tidyverse)
+test_translations = read_csv(&#39;test_translations.csv&#39;)
+datatable(test_translations)</code></pre>
+<div id="htmlwidget-1" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"filter":"none","data":[["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","44","45","46","47","48","49","50","51","52","53","54","55","56","57","58","59","60","61","62","63","64","65","66","67","68","69","70","71","72","73","74","75","76","77","78","79","80","81","82","83","84"],["i disagree","we try","i refuse","i promised","you cheated","we need water","she is kind","we shared everything","i totally forgot","i felt awful","i was really upset","he is no fool","he drives me crazy","i hurt myself today","i learned something today","you have to keep fit","he lives within his means","she seems to be sick","she talked to the chairperson","you only need to concentrate","i don't understand why you're leaving","i will never forget seeing you","he couldn't concentrate on the conversation","i loved working here with you","i can't believe he kissed you","he turned out to be her father","i only found out about that today","i want you to take this medicine","we shared the profit among us all","i didn't want you involved in this","she appears to have a lot of friends","i just don't want you to misunderstand me","he does not seem to be very tired","you look like you're about to throw up","i don't know why we have to stop","she came here as soon as she heard it","i missed the train i should have come earlier","she lay on a sofa with her eyes closed","i have made up my mind to leave japan","i don't think i could ever do this again","he told me that he wanted to leave the company","he stayed home from school because he wasn't feeling well","i am what i am today thanks to my parents","i think you'd better lie low until she forgives you","he decided to give up smoking once and for all","i regret to inform you that your application has been refused","i always drink a glass of milk before going to sleep","i never imagined so many people would come to my party","i go for a walk every day except when it rains","you can see how much difference a few degrees can make","you can tell a lot about someone by the company they keep","i really don't want to go out on a date with mary","i want you to go to your room and lock the door","you don't have to do that if you don't really want to","i just know that i don't want to be married to you","i was surprised because my husband actually ate some of our wedding cake","i have made up my mind to achieve my goals in three years","he is sure to pass the exam if he studies at this rate","she looked after her sister who was in bed with a bad cold","i knew we were going to get married the moment i met you","we will have to put off the soccer game because of the bad weather","i think it's time for me to spend a little time with my children","he had been living in nagano for seven years when his daughter was born","i want to give you some money to help you through these hard times","i can't show up looking like i've been working on the farm all day","i do not have the courage to ask my boss to lend me his car","i like this picture not because it is a masterpiece but because it has charm","i know how to solve the problem but i've been asked not to tell you","he decided to feed his dog the rabbit that he had shot earlier that day","she advised him to go there alone but he didn't think that was good advice","i can't believe that you aren't at least willing to consider the possibility of other alternatives","i got it through my head that my parent's strict rules were for my own benefit","she got so carried away listening to the beatles that she missed the date with him","i had a few hours free so i sat under a tree and read a book","he is usually straightforward and sincere and thereby gains the confidence of those who meet him","i don't think that there is any better way to learn english than by living in america","i know you've been waiting a long time but could you wait just a little bit longer","you may not agree with him but at least he stands up for what he believes in","i suggest you have a native speaker read over your report to make sure there are no errors","she asked him to give her some money so she could go to a restaurant with her friends","i guess what i've said isn't all that clear but that's the only way i can explain it","i began driving our tractor when i was 12 years old to help my father out at harvest time","you may not be in the mood to hear this now but i need to tell you something important","he is likely to have a book and a cracker at his meals and then forget to eat the cracker"],["je n'en suis pas opposé dessus","nous sommes préoccupés","je refuse","je refuse de","vous avez triché","nous avons besoin d'eau","elle est puissante","nous avons tout perdu","j'ai complètement oublié","je me suis senti affreusement mal","j'étais vraiment contente","il n'est pas fou","il me rend fou","je me suis en premier aujourd'hui","j'ai entendu plaisir chose","tu dois garder garder forme","il vit tout sa chambre","elle semble être malade","elle a parlé avec la présidente","il vous faut que perdre tes","je ne comprends pas pourquoi vous partez","je n'oublierai jamais t'avoir","il n'a pas s'empêcher de la à la","j'ai adoré travailler avec avec toi","je n'arrive pas à croire qu'il vous ait ait","il a été retentir pour père","je n'ai mieux que faire tout aujourd'hui","je veux que tu prennes à médicament","nous avons acheté le le du du la du ensemble","je ne voulais pas que tu y mêlée de ça","elle semble avoir été beaucoup d'amis","je ne veux pas que vous vous compreniez de travers point","il ne sera pas d'être différente ignorance","tu dirait que vous concentrer de vous de vomir","j'ignore pourquoi vous pas arrêter","elle est restée ici d'ici que je peut","j'ai loupé le train de j'aurais j'y me puisse","elle est étendue sur terre dans les les","je l'ai fuir pour avance la","je ne pense pas que je puisse le faire refaire","il m'a dit qu'il voulait conseils à la","il s'est resté seul à la qu'il ne demandait chez lui ne ne pas","je suis sûr que je je de à mon parents dernière","je pense que tu as mieux de ce que je ne jamais","il a décidé de le partie de la française de toutes","je vous démissionné d'ouvrir la la la ne pas pas tomber","je bois toujours un verre avant avant d'aller d'aller","je n'ai jamais jamais cette la chose que je à la la mère","je vais faire les promenade tous les sauf sauf sauf le","vous pouvez le faire comment faire ceci à ceci","vous pouvez rester dans de de de la raison à mes parents","je ne veux vraiment pas aller avec ce film le ce moment","je veux que tu ailles dans ta chambre et que vous la verrouilles verrouilliez la porte","vous n'êtes pas obligée de le faire si vous ne le voulez vraiment vraiment","je sais tout simplement que je ne veux pas être mariée avec vous","j'ai été qu'une UNK que mon problèmes faisait dans et et canine de père","je fois d'ouvrir que je parce que j'avais mes petit","il est tellement juste la ce après qu'il le le","elle a à sa chambre de lui de la regarda","je savais que nous allions nous marier au moment où je t'ai rencontré","nous voudrais étudier le la pluie et mettre mettre zone de notre","je pense qu'il est temps pour moi de peu un peu de mes de","il vivait à nagano depuis découvrir ans lorsque sa sœur est née","je veux vous donner tout l'argent pour t'aider traverser traverser ces vicissitudes","je ne peux pas imaginer une telle films ce que les les monde le monde","je n'ai pas le temps de prendre me voiture manquer moi moi tranquille","je préfère tableau que ces gens c'est je n'ai pas pas chef une blague","je sais comment résoudre la radio mais je dit pas dire le le le","il a décidé réduire les les mois terminer mais le le mais alors un jour","elle lui a recommandé de pas conseils sans il mais pensait pas il suivi","je n'arrive pas à croire que tu ne sois pas au moins disposés à envisager d'autres possibilités possibilités","je me ramené tenue de ma ma de dites de la à dites de mon","elle n'a encore fait un tout lui qu'elle lui lui lui","je passé quelques liste à un journal que je trouvait neuf une une librairie un nombreuses heure","il fait trois ans qui UNK papa que quelque ne papa papa à les gens ne soit","je ne pense pas qu'il tom soyons la manière à ait une aussi aussi","je sais que tu as attendu deux moyens que tu t'ai attendre un petit petit plus","vous ne n'es pas d'accord moins moins moins pas défend défend défend défend défend ce que","je suggère que vous donnes un de deux et je donnes une une chose pas de de","elle lui demanda de donner devait l'argent de l'argent de lui restaurant restaurant à la la","je suppose que ce n'est pas mais je ne ne pas pas les gens et et les pas","j'ai commencé à démissionner de la essayer à je père et une maison et j'étais amis mes jour","vous trente peut de vous n'avions gens mais ne choses pas pas ne ne pas pas pas dise","il allait particulièrement au car ville après après après après rentré tandis et terminé et le une"],["je ne suis pas d'accord","on essaye","je refuse","j'ai promis","tu as triché","il nous faut de l'eau","elle est gentille","nous avons tout partagé","j'ai complètement oublié","je me suis sentie affreusement mal","j'étais vraiment triste","il n'est pas idiot","il me rend dingue","je me suis fait mal aujourd'hui","j'ai appris quelque chose aujourd'hui","vous devez garder la forme","il vit selon ses moyens","elle a l'air d'être malade","elle a parlé avec le président","vous devez seulement vous concentrer","je ne comprends pas pourquoi tu pars","je n'oublierai jamais vous avoir vus","il ne pouvait se concentrer sur la conversation","j'ai adoré travailler ici avec vous","je ne parviens pas à croire qu'il vous ait embrassés","il se révéla être son père","je ne l'ai découvert qu'aujourd'hui","je veux que vous preniez ce médicament","nous partageâmes les profits entre nous tous","je ne voulais pas que tu sois mêlé à ça","elle semble avoir beaucoup d'amis","je ne veux tout simplement pas que vous me compreniez de travers","il ne semble pas très fatigué","on dirait que vous êtes sur le point de vomir","j'ignore pourquoi nous devons nous arrêter","elle est venue ici dès qu'elle l'a entendu","j'ai manqué le train j'aurais dû venir plus tôt","elle était allongée sur un sofa les yeux clos","je me suis décidé à quitter le japon","je ne pense pas pouvoir jamais le refaire","il me dit qu'il voulait quitter la société","il resta chez lui plutôt que d'aller à l'école parce qu'il ne se sentait pas bien","je dois ce que je suis aujourd'hui à mes parents","je pense que tu devrais adopter un profil bas jusqu'à ce qu'elle te pardonne","il décida de cesser de fumer une fois pour toutes","j'ai le regret de vous informer que votre candidature a été rejetée","je bois toujours un verre de lait avant d'aller dormir","je n'ai jamais imaginé que tant de gens viendraient à ma fête","je me promène quotidiennement excepté s'il pleut","vous pouvez voir quelle différence quelques degrés font","on peut dire beaucoup d'une personne en fonction de la société qu'elle entretient","je ne veux vraiment pas aller au rendez vous avec mary","je veux que vous alliez dans votre chambre et que vous verrouilliez la porte","tu ne dois pas le faire si tu ne le veux vraiment pas","je sais que je ne veux pas être mariée avec vous un point c'est tout","j'étais surprise parce que mon mari avait en fait mangé un peu de notre gâteau de mariage","je me suis décidé à atteindre mes objectifs dans trois ans","il est certain de réussir l'examen s'il étudie à ce rythme","elle s'est occupée de sa sœur qui était alitée en proie à un mauvais rhume","je savais que nous allions nous marier au moment où je t'ai rencontrée","nous allons devoir reporter le match de foot à cause du mauvais temps","je pense qu'il est temps que je passe un peu de temps avec mes enfants","il vivait à nagano depuis sept ans quand sa sœur est née","je veux vous donner de l'argent pour vous aider à traverser ces temps difficiles","je ne peux pas me montrer avec l'air de quelqu'un qui a travaillé toute la journée à la ferme","je n'ai pas le courage de demander à mon patron qu'il me prête sa voiture","j'aime cette peinture non pas parce que c'est un chef d'œuvre mais parce qu'elle a du charme","je sais comment résoudre le problème mais on m'a demandé de ne pas vous le dire","il décida de donner à manger à son chien le lapin qu'il avait tiré plus tôt ce jour là","elle lui recommanda d'y aller seul mais il ne pensa pas que c'était un bon conseil","je n'arrive pas à croire que vous ne soyez pas au moins disposé à envisager d'autres possibilités","je me suis convaincu que les règles strictes de mes parents étaient pour mon propre bien","elle écoutait les beatles et s'est tellement laissée emporter qu'elle a manqué son rendez vous amoureux avec lui","je disposai de quelques heures de libres aussi je m'assis sous un arbre et lus un livre","il est d'ordinaire direct et sincère et gagne ainsi la confiance de ceux qui le rencontrent","je ne pense pas qu'il y ait de meilleure méthode pour apprendre l'anglais que de vivre aux états unis","je sais que vous avez attendu pendant longtemps mais pourriez vous attendre juste un peu plus longtemps","peut être n'êtes vous pas d'accord avec lui mais au moins il défend ce à quoi il croit","je suggère que tu fasses relire ton rapport par un natif pour t'assurer qu'il n'y a pas d'erreurs","elle lui a demandé de lui donner de l'argent pour pouvoir aller au restaurant avec ses amis","je devine que ce que j'ai dit n'est pas très clair mais c'est la seule façon que j'ai de l'expliquer","je conduisais notre tracteur dès l'âge de 12 ans pour aider mon père pendant la moisson","peut être n'es tu pas d'humeur à entendre ça maintenant mais je dois de dire quelque chose d'important","il a des chances d'avoir un livre et un biscuit pour ses repas et puis d'oublier de manger le biscuit"],[0,0,1,0,1,1,0,0,1,1,0,1,1,0,0,0,0,1,1,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],["Exactly the opposite meaning.",null,null,null,null,null,"Kind != powerful","Sharing != losing",null,null,"Upset != happy",null,null,null,null,null,null,null,null,null,null,"So close!",null,"I'll let it pass.","So close! Kudos for using \"arriver à croire\"",null,null,"So close! Kudos for using subjunctive.",null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,"So so close!","I'll let it pass.",null,null,null,null,null,null,null,null,null,"Very close!",null,null,null,null,null,null,"Almost perfect!",null,null,null,null,null,null,null,null,null,null,null,null,null]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>input_sentence<\/th>\n      <th>model_translation<\/th>\n      <th>ground_truth_translation<\/th>\n      <th>manual_assessment<\/th>\n      <th>comment<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":4},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<p>Although it only gets 20% of the test sentences correct,<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a> I’m still rather impressed with the quality, especially with long sentences and tricky grammar points. For example, I’m quite proud that it aptly translates No. 60 “i knew we were going to get married the moment i met you” to “je savais que nous allions nous marier au moment où je t’ai rencontré” - it gets both the subjunctive tense <em>nous allions</em> and the reflexive verb <em>se marier</em> correct!</p>
+<p>Overall, the trend is that it has more trouble with longer sentences, which may either be due to the model itself or the lack of long sentences in the training data to start with.<a href="#fn9" class="footnoteRef" id="fnref9"><sup>9</sup></a> If the latter plays a bigger part, I wonder if my limitation of the training data to those that start with a pronoun actually hurt the model performance - I’ll experiment with more sentences in the future. Regardless, compared with my first attempt which was only able to correctly translate the first few words, this is certainly a step-up.<a href="#fn10" class="footnoteRef" id="fnref10"><sup>10</sup></a></p>
+</div>
+<div id="next-steps" class="section level3">
+<h3>Next steps</h3>
+<p>After implementing the attention mechanism by following Jeremy’s tutorial, I am interested in exploring other implementations and extensions. For example, this PyTorch <a href="http://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html">tutorial</a> does it slightly differently in that it uses teacher-forcing in both constructing the alignment function and concatenating the weighted sum (whereas in the tutorial I followed and implemented, the technique is only used in the latter). Doing so may further speed up the convergence.</p>
+<p>Another thing that I want to investigate further is the attention weights themselves. When trying to visualize them, I did not see a clear diagonal pattern as Bahdanau et al. presented in their paper. In fact, the pattern I found is rather random and sometimes highlights the zero paddings. I wonder if it’s because of of my implementation or because I didn’t train it long enough. However, even the correct translations don’t exhibit a diagonal alignment, which still puzzles me. I wonder if, instead of padding all sentences to the maximum length, using a more compact padding scheme like <a href="https://www.tensorflow.org/tutorials/seq2seq#bucketing_and_padding">bucketing</a> will help. Theoretically, the model should eventually learn to ignore the zero paddings but reducing the amount of paddings should help it focus better. Maybe one day it will be good enough to correctly translate “he is likely to have a book and a cracker at his meals and then forget to eat the cracker” (the last sentence in the table above) while figuring out what he eats instead.</p>
+</div>
+<div id="references" class="section level3">
+<h3>References</h3>
+<p>Dzmitry Bahdanau,Kyunghyun Cho,and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. <em>arXiv preprint arXiv:1409.0473</em>, 2014.</p>
+<p>Vinyals, O., L. Kaiser, T. Koo, S. Petrov, I. Sutskever &amp; G. E. Hinton (2014). Grammar as a foreign language. <em>CoRR, abs/1412.7449.</em></p>
+<p>Jeremy Howard, Rachel Thomas. <a href="http://www.fast.ai/">fast.ai</a> Lesson 13 - Neural Translation. <a href="http://course.fast.ai/lessons/lesson13.html" class="uri">http://course.fast.ai/lessons/lesson13.html</a></p>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>For a more detailed comparison between PyTorch and Keras, you can read about this <a href="http://www.fast.ai/2017/09/08/introducing-pytorch-for-fastai/">post</a> by Jeremy and his decision to switch to PyTorch in his teaching.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>For example, I can’t rave enough about how similar it is to Scikit-Learn, which I imagine is what deep learning framework will ultimately become.<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>Another implementation detail is that, because we give users the option to use the previous target label, which is usually in the form of a one-hot encoded vector, when we are not using teacher-forcing, to keep the format consistent, instead of using the previous hidden state as the paper suggested, we use the previous prediction output, also a one-hot encoded vector, which is essentially the previous hidden state fed to another linear layer.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>Except I used LSTM and the tutorial used GRU.<a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p>The tutorial provides this <a href="https://download.pytorch.org/tutorial/data.zip">link</a> to download the data.<a href="#fnref5">↩</a></p></li>
+<li id="fn6"><p>Note <code>decoder_input</code> is initialized to be a special <code>GO</code> character.<a href="#fnref6">↩</a></p></li>
+<li id="fn7"><p>Yes, my French is good enough to evaluate the translation quality.<a href="#fnref7">↩</a></p></li>
+<li id="fn8"><p>Some of the mistranslations are rather funny. For example, it translates “we shared everything” to “nous avons tout perdu”, which means we lost everything.<a href="#fnref8">↩</a></p></li>
+<li id="fn9"><p>Most of the sentences in the training data are within 10 words.<a href="#fnref9">↩</a></p></li>
+<li id="fn10"><p>Although I was using a more complicated dataset, EuroParl, in the previous experiment, so it’s not clear how much the improvement is due to the model itself unless I reuse the same dataset in the new model.<a href="#fnref10">↩</a></p></li>
+</ol>
+</div>
