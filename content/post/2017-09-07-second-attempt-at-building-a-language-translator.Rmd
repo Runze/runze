@@ -10,7 +10,7 @@ tags:
   - RNN
   - LSTM
   - NLP
-description: ''
+description: 'Using a sequence-to-sequence model with attention'
 draft: yes
 topics: []
 ---
