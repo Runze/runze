@@ -162,6 +162,8 @@ suppressMessages(library(lmtest))
 options(&#39;getSymbols.warning4.0&#39; = F)
 
 getSymbols(&#39;AAPL&#39;)</code></pre>
+<pre><code>## Warning in as.POSIXlt.POSIXct(Sys.time()): unknown timezone &#39;zone/tz/2018c.
+## 1.0/zoneinfo/America/Los_Angeles&#39;</code></pre>
 <pre><code>## [1] &quot;AAPL&quot;</code></pre>
 <pre class="r"><code>aapl = data.frame(AAPL)
 aapl$date = row.names(aapl)
@@ -191,7 +193,7 @@ plot.ts(resid)</code></pre>
 ##  Durbin-Watson test
 ## 
 ## data:  model
-## DW = 1.9703, p-value = 0.3613
+## DW = 1.961, p-value = 0.2242
 ## alternative hypothesis: true autocorrelation is greater than 0</code></pre>
 <pre class="r"><code>par(mfrow = c(2, 2))
 plot(model)</code></pre>
