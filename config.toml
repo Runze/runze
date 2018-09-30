@@ -21,9 +21,6 @@ ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
     name = "GitHub"
     url = "https://github.com/Runze"
 [[menu.main]]
-    name = "LinkedIn"
-    url = "https://www.linkedin.com/in/runze-wang-413a091a/"
-[[menu.main]]
     name = "Twitter"
     url = "https://twitter.com/runze_w"
 
