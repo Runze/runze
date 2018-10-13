@@ -27,8 +27,9 @@ topics: []
 <h3>Update</h3>
 <p>Recently, upon various trials and errors, I have finally implemented the same model in Keras (<a href="https://github.com/Runze/seq2seq-translation-attention">GitHub</a>), largely thanks to the deep learning <a href="https://www.coursera.org/specializations/deep-learning#courses">course</a> offered by Andrew Ng on Coursera (especially the one on sequence models) and, obviously, Stack Overflow. 🙏</p>
 <p>Below are the original post:</p>
-<hr />
 </div>
+<div id="section" class="section level2">
+<h2>————</h2>
 <div id="background" class="section level3">
 <h3>Background</h3>
 <p>A few weeks ago, I experimented with building <a href="https://runze.github.io/2017/08/14/first-attempt-at-building-a-language-translator/">a language translator</a> using a simple sequence-to-sequence model. Since then, I had been itchy to add an extra attention layer to it that I had been reading so much about. After many, many research, I came across (quite accidentally) this MOOC <a href="http://course.fast.ai/part2.html">series</a> offered by <a href="http://www.fast.ai/">fast.ai</a>, where on <a href="http://course.fast.ai/lessons/lesson13.html">Lesson 13</a>, instructor Jeremy Howard walked the students through a practical implementation of the attention mechanism using PyTorch. Given that PyTorch was another framework that I had yet to learn and knowing that it was not as high level as Keras, I was initially hesitant in following the tutorial. However, after seeing Jeremy demonstrate the superior flexibility and customization of PyTorch, I decided to roll up my sleeves and learn the framework. Yes, you can’t just write a couple of lines of code to build an out-of-box model in PyTorch as you can in Keras, but PyTorch makes it easy to implement a new custom layer like attention.<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a> That said, I still like and appreciate how elegantly and thoughtfully Keras is designed<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a> and, now that <a href="http://www.fast.ai/2017/01/03/keras/">TensorFlow has chosen Keras</a> to be the first high-level library added to its core framework, I have full confidence that it will only get better and overcome these limitations.</p>
@@ -350,6 +351,7 @@ datatable(test_translations)</code></pre>
 <p>Dzmitry Bahdanau,Kyunghyun Cho,and Yoshua Bengio. Neural machine translation by jointly learning to align and translate. <em>arXiv preprint arXiv:1409.0473</em>, 2014.</p>
 <p>Vinyals, O., L. Kaiser, T. Koo, S. Petrov, I. Sutskever &amp; G. E. Hinton (2014). Grammar as a foreign language. <em>CoRR, abs/1412.7449.</em></p>
 <p>Jeremy Howard, Rachel Thomas. <a href="http://www.fast.ai/">fast.ai</a> Lesson 13 - Neural Translation. <a href="http://course.fast.ai/lessons/lesson13.html" class="uri">http://course.fast.ai/lessons/lesson13.html</a></p>
+</div>
 </div>
 <div class="footnotes">
 <hr />
