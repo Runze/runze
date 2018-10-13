@@ -13,4 +13,4 @@ My name is Runze and I'm a data scientist, an avid language-learner, and a self-
 
 If you insist on knowing more, you can reach me at ernuzwang@gmail.com.
 
-à bientôt :-)
+à bientôt :)
