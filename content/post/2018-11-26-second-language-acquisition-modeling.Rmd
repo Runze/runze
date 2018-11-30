@@ -126,7 +126,7 @@ My candidate explanatory variables are historical data we have for each user in 
 
 To find out which ones of them influence the per-user ROC the most, I ran a simple linear regression controlling for all of them and found the following results:
 
-<img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/roc_regression.png" alt="alt text" width="800">
+<img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/roc_regression.png" alt="alt text" width="700">
 
 As shown above, the result suggests that:
 
