@@ -1,0 +1,146 @@
+---
+title: Second Language Acquisition Modeling using Duolingo's Data
+author: Runze
+date: '2018-11-26'
+slug: second-language-acquisition-modeling
+categories:
+  - Data Analysis
+tags:
+  - Deep Learning
+  - NLP
+  - RNN
+description: ''
+topics: []
+---
+
+<script src="/rmarkdown-libs/htmlwidgets/htmlwidgets.js"></script>
+<script src="/rmarkdown-libs/jquery/jquery.min.js"></script>
+<link href="/rmarkdown-libs/datatables-css/datatables-crosstalk.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/datatables-binding/datatables.js"></script>
+<link href="/rmarkdown-libs/dt-core/css/jquery.dataTables.min.css" rel="stylesheet" />
+<link href="/rmarkdown-libs/dt-core/css/jquery.dataTables.extra.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/dt-core/js/jquery.dataTables.min.js"></script>
+<link href="/rmarkdown-libs/crosstalk/css/crosstalk.css" rel="stylesheet" />
+<script src="/rmarkdown-libs/crosstalk/js/crosstalk.min.js"></script>
+
+
+<div id="background" class="section level3">
+<h3>Background</h3>
+<p>Recently, I have discovered the <a href="http://sharedtask.duolingo.com/">Second Language Acquisition Modeling (SLAM)</a> challenge hosted by Duolingo earlier this year, where they had asked the participants to predict the per-token error rate for a given language learner based on his/her past learning history. To conclude the competition, the team has also written a <a href="https://ai.duolingo.com/papers/settles.slam18.pdf">paper</a> to summarize the results and the approaches that were taken by the various participants and their respective effectiveness. After reading the paper and the top competitors’ system papers (particularly <a href="http://sharedtask.duolingo.com/papers/osika.slam18.pdf">the one published by SanaLabs</a>), I just couldn’t resist playing around with the data myself :)</p>
+<p>Given that the competition has long ended and that I have already read the system papers (and thus have the benefit of hindsight), my goal for this project is not to compete but rather to see whether, built upon the shared knowledge and experience, I can create a simple model that produces decent results. Simplicity is important because 1) I’m always curious to see how far an easily built and understandable model can go and 2) as a side project, I didn’t plan to allocate too much time to it. The goal influenced many modeling decisions. For example, instead of building three separate models, one for each track (English, Spanish, and French), I decided to build only one single shared-track model to predict the error rate for all of them in one shot. That said, I did opt directly to using an RNN instead of experimenting with a classical approach. The decision was made because I was curious to see how RNNs can be applied to the various types of sequential data with minimum feature engineering and that the team’s meta study found that using a RNN-based structure provides the biggest uplift to the final performance.</p>
+<p>In the end, I was rather happy with my model results. In particular, the model scored the following ROC and F1 scores in the three respective tracks, which stands around the middle of all 15 participants:</p>
+<div id="htmlwidget-1" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"filter":"none","data":[["1","2","3"],["en_es","es_en","fr_en"],[0.835,0.801,0.826],[0.45,0.395,0.473]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>track<\/th>\n      <th>auroc<\/th>\n      <th>f1<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"columnDefs":[{"className":"dt-right","targets":[2,3]},{"orderable":false,"targets":0}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+<p>All my code is hosted in this <a href="https://github.com/Runze/duolingo-slam">repo</a>. The rest of the post would focus on the feature selections, the model architecture, and the post-modeling evaluations.</p>
+</div>
+<div id="features" class="section level3">
+<h3>Features</h3>
+<p>To keep it simple, I only used the features provided in the original dataset and did not engineer anything extra myself. In particular, this means that my model includes the following user and word specific features:</p>
+<ul>
+<li>User features:
+<ul>
+<li>Track (i.e., <code>en_es</code>, <code>es_en</code>, <code>fr_en</code>)</li>
+<li>User ID</li>
+<li>Country<a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a></li>
+<li>Client (i.e., <code>ios</code>, <code>android</code>, <code>web</code>)</li>
+<li>Days in course</li>
+</ul></li>
+<li>Word features:
+<ul>
+<li>Word<a href="#fn2" class="footnoteRef" id="fnref2"><sup>2</sup></a></li>
+<li>Part of speech</li>
+<li>Dependency labels</li>
+<li>Dependency edges</li>
+<li>Morphology features</li>
+<li>Response time</li>
+<li>Format (i.e., <code>reverse_translate</code>, <code>reverse_tap</code>, <code>listen</code>)</li>
+<li>Session (i.e., <code>lesson</code>, <code>practice</code>, <code>test</code>)</li>
+</ul></li>
+</ul>
+<p>The label is the per-word accuracy: 0 if correct and 1 if not.</p>
+</div>
+<div id="model" class="section level3">
+<h3>Model</h3>
+<p>The model architecture is shown in the diagram below. Simply put, it is a bidirectional GRU model where each input is a concatenation of all the features mentioned above and each output is the predicted error rate for the current word.</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/model.png" alt="alt text" width="800"></p>
+<p>For categorical features, each of them is first mapped into a randomly-initiated embedding vector before being concatenated with the others. The embedding size is determined based on the feature’s original cardinality (in particular, <code>cardinality // 2</code> <a href="#fn3" class="footnoteRef" id="fnref3"><sup>3</sup></a>), capped at 256.</p>
+<p>For numerical features, they are concatenated directly with the others without any preprocessing. Because of the various ranges of the input features, a batch normalization layer is added after the concatenation to speed up the training.</p>
+<p>The bidirectional GRU has a single layer with a hidden units size of 256 (I have experimented with 2 layers but did not see an improvement in the results). I have also tried replacing GRU with LSTM, which took longer to train but only provided less than 1% of relative uplift in the results, so I stuck with GRU.</p>
+<p>From each GRU unit, its output is further processed by two dense layers and finally a softmax activation to normalize the output into probabilities. Softmax is used instead of sigmoid, which is usually a choice for binary predictions, because aside from the original two classes, I also added an extra one for the padding token, which is necessary for batch processing.</p>
+</div>
+<div id="training" class="section level3">
+<h3>Training</h3>
+<p>To train the model, I used the standard Adam optimizer with a learning rate of 0.001 and the cross-entropy loss. The model is trained with early stopping and, as shown below, the validation loss plateaued (and the ROC peaked) at the 10th epoch:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/model_training.png" alt="alt text" width="500"></p>
+<p>Finally, to take advantage of the dev data, I trained another model using the combined data under the same architecture and hyperparameters also for 10 epochs.<a href="#fn4" class="footnoteRef" id="fnref4"><sup>4</sup></a> The resulting model was later applied to the test data to generate final predictions.</p>
+</div>
+<div id="performance-evaluation" class="section level3">
+<h3>Performance evaluation</h3>
+<p>In addition to the test set performance metrics shown above, I was also curious about the feature importance, the interpretability of the learned embeddings, and the error analysis, all of which I explored below.</p>
+<div id="feature-importance" class="section level4">
+<h4>Feature importance</h4>
+<p>To estimate the feature importance, I use the actual model performance on the dev set as the baseline, and shuffle one feature from the dataset at a time to measure the decrease in performance, which is then used as an indicator to the given feature’s relative importance.<a href="#fn5" class="footnoteRef" id="fnref5"><sup>5</sup></a> The resulting importance, in terms of both the decrease in ROC and F1 score, is shown below:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/feat_imp.png" alt="alt text" width="700"></p>
+<p>As shown above, three features stand out as the most important ones: the word itself, the exercise format, and the user.<a href="#fn6" class="footnoteRef" id="fnref6"><sup>6</sup></a> Among them, format is the most straightforward to understand because, compared to <code>reverse_translate</code> and <code>listen</code>, <code>reverse_tap</code> is much easier given that the candidate words have all been shown to the students. In fact, based on the training data, its error rate is three times less than the other two formats. As for the word and the user, they are both of high dimensions so to facilitate the interpretations, I visualized their learned embeddings below.</p>
+</div>
+<div id="learned-embeddings" class="section level4">
+<h4>Learned embeddings</h4>
+<p>To visualize the high-dimensional embeddings (256), I used t-SNE combined with PCA.<a href="#fn7" class="footnoteRef" id="fnref7"><sup>7</sup></a> Below is the reduced 2D embeddings for all the 6K in-vocabulary words, colored by their respective per-word error rate:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/embeddings_token_w_12_plt.png" alt="alt text" width="700"></p>
+<p>As shown above, the model appeared to have moved words with high error rates close to each other in the embedding space to make the prediction easier (i.e., the dark blue cluster in the bottom right corner). It should be noted that many of these are also low frequency words which not many students have attempted yet (and are hence presumably more difficult).</p>
+<p>In addition, below is the same plot for all the 6K users and their average error rate:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/embeddings_user.png" alt="alt text" width="700"></p>
+<p>In a similar pattern as seen above, the model effectively clustered users based on their historical error rate, which is a reasonable thing to do as well.</p>
+<p>In addition to these embeddings’ relationships with the outcome variable, I was also interested in seeing how they interact with each other. For example, do these word embeddings, trained for a specific downstream task, exhibit the same kind of pattern as those trained in an unsupervised way do (e.g., word2vec) where semantically similar words are clustered together? To answer this question, I first plotted the top 100 learned English word embeddings below:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/embeddings_token_w_l2_en_plt.png" alt="alt text" width="700"></p>
+<p>As it turns out, some of them indeed do! For example, object pronouns <em>her</em>, <em>me</em>, and <em>it</em> are close to each other (far-right), food-related words <em>lunch</em>, <em>dinner</em>, <em>drink</em>, <em>eat</em>, and <em>cook</em> are grouped together (upper-left), and time-related notions <em>monday</em>, <em>sunday</em>, <em>saturday</em>, <em>tomorrow</em>, and <em>morning</em> are also close (center-bottom). Why do they do this? I think one explanation is that semantically similar words are often organized into a single course and taught together based on its meanings and difficulties. Hence, students who were learning these new concepts are likely to exhibit the same level of error rate on all of them too, which led the model to push them close to each other. It also helps that the corpus includes only new learners in their first 30 days so that the learning materials conveniently overlap with each other.</p>
+<p>At this point I had a crazy idea: trained this way, would the same words in different languages are also close to each other in the embedding space? To test this hypothesis, I plotted the top English and French word embeddings below:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/embeddings_token_w_l2_en_fr_plt.png" alt="alt text" width="700"></p>
+<p>Sadly (but expectedly), it’s not quite the case as the nearby red and blue words above are rather random (despite some happy surprises like <em>you</em> and <em>tu</em>). It makes sense in the hindsight because, to make them overlap, the English and French course materials need to overlap each other too, which is not necessarily the case (although there may be similarities).</p>
+</div>
+<div id="error-analysis" class="section level4">
+<h4>Error analysis</h4>
+<p>Lastly, I decided to do some error analysis to find out the cases where the model works well and those where it does not. In particular, I was interested in looking at it on a per-user basis because it’s the most actionable. Hence, inspired by the meta-study, I computed per-user ROC on the test set<a href="#fn8" class="footnoteRef" id="fnref8"><sup>8</sup></a> and my goal is to find out what factors lead to a higher or lower ROC for a given user.</p>
+<p>My candidate explanatory variables are historical data we have for each user in the training and dev sets. In particular, I considered the following:</p>
+<ul>
+<li>Historical usage frequency (i.e., the number of words a user has attempted in the training and dev data)</li>
+<li>Of all the historical words a user has attempted, the % of them that are of high frequency in the corpus (i.e., the top 10% of the most common words)</li>
+<li>Historical error rate</li>
+<li>Learning track</li>
+<li>Client</li>
+</ul>
+<p>To find out which ones of them influence the per-user ROC the most, I ran a simple linear regression controlling for all of them and found the following results:</p>
+<p><img src="https://raw.githubusercontent.com/Runze/duolingo-slam/master/plots/roc_regression.png" alt="alt text" width="800"></p>
+<p>As shown above, the result suggests that:</p>
+<ol style="list-style-type: decimal">
+<li>As expected, the model does well if a user has a lot of historical data (hence the historical frequency is positively significant and the web client is negatively so<a href="#fn9" class="footnoteRef" id="fnref9"><sup>9</sup></a>) and if many of these historical words are also high-frequency words. Both of these findings make sense given that both words and user IDs are significant features in the model itself.</li>
+<li>Track also matters. In particular, on a per-user basis, the model performs the best on the <code>fr_en</code> track and the worst on the <code>es_en</code> track.<a href="#fn10" class="footnoteRef" id="fnref10"><sup>10</sup></a></li>
+<li>One’s historical error rate doesn’t matter to the model’s performance on him/her, which is reassuring.</li>
+</ol>
+</div>
+</div>
+<div id="conclusions-and-future-work" class="section level3">
+<h3>Conclusions and future work</h3>
+<p>In this project, I analyzed Duolingo’s SLAM challenge data and, upon reviewing the system papers, built an RNN-based model myself to predict the per-user, per-token error rate that yielded decent performance. Further analysis revealed that the words’ surface forms, the exercise format, and the user IDs are the most important features in the model. In addition to modeling, I have also analyzed the learned embeddings of the words and the users, which showed that the model effectively clustered them based on their respective error rates. Finally, I performed an error analysis which showed that, on a per-user basis, one’s historical usage frequency, the frequency of the words learned, as well as one’s client and track significantly correlate with the model’s performance on him/her.</p>
+<p>There is still a lot of interesting things we can do with the data itself. One thing that I’m particularly interested in is to visualize whether and how one learns from his/her past mistakes, and how that compares with the model predictions. For example, a simplistic model that naively predicts error rate based on the past may keep predicting a user would always make the same mistake over and over again in the future, but one that takes into account of the learning trajectory may be able to adjust the error rate accordingly. Frankly, at this point, I have no idea if my model is able to do that. (If not, there would be no point in using an RNN.) I tried to sample a few users to see if there are some easy patterns but the data is too noisy. In the future, I’ll explore devising some aggregated metrics, like the actual vs. predicted conditional error rate, to see if there is a mismatch between the reality and the prediction.</p>
+</div>
+<div id="references" class="section level3">
+<h3>References</h3>
+<p>Burr Settles, Chris Brust, Erin Gustafson, Masato Hagiwara, Nitin Madnani. Second Language Acquisition Modeling. <em>Proceedings of the Thirteenth Workshop on Innovative Use of NLP for Building Educational Applications</em>, pages 56–65. June 5, 2018.</p>
+<p>Anton Osika, Susanna Nilsson, Andrii Sydorchuk, Faruk Sahin, Anders Huss. Second Language Acquisition Modeling: An Ensemble Approach. <em>Proceedings of the Thirteenth Workshop on Innovative Use of NLP for Building Educational Applications</em>, pages 217–222. June 5, 2018.</p>
+</div>
+<div class="footnotes">
+<hr />
+<ol>
+<li id="fn1"><p>If a user has used Duolingo in two countries, only the first is used.<a href="#fnref1">↩</a></p></li>
+<li id="fn2"><p>Because the model includes all three languages, to prevent the confusion that is resulted from the identically spelled but semantically different words, each word is concatenated with its respective language (e.g., <code>en:hello</code>).<a href="#fnref2">↩</a></p></li>
+<li id="fn3"><p>A rule of thumb I picked up from <a href="https://github.com/fastai/fastai/blob/master/courses/dl1/lesson3-rossman.ipynb">the fast.ai course</a>.<a href="#fnref3">↩</a></p></li>
+<li id="fn4"><p>Due to time constraint, I did not perform any hyperparameter tuning.<a href="#fnref4">↩</a></p></li>
+<li id="fn5"><p>The shuffle is done on the user level, which is to say that each user’s sequence order is kept intact.<a href="#fnref5">↩</a></p></li>
+<li id="fn6"><p>Frankly, I’m a bit surprised that response time is not being considered as an important feature by my model given that the meta-study showed that including it generates a significant effect. A potential reason is that I did not perform any outlier control in my preprocessing, which might have weakened its impact.<a href="#fnref6">↩</a></p></li>
+<li id="fn7"><p>As recommended by the author of t-SNE (and cited by <a href="https://scikit-learn.org/stable/modules/generated/sklearn.manifold.TSNE.html">scikit-learn</a>), “[i]t is highly recommended to use another dimensionality reduction method (e.g. PCA for dense data or TruncatedSVD for sparse data) to reduce the number of dimensions to a reasonable amount (e.g. 50) if the number of features is very high. This will suppress some noise and speed up the computation of pairwise distances between samples.”<a href="#fnref7">↩</a></p></li>
+<li id="fn8"><p>Including only users who have both correct and incorrect responses and who have at least 30 observations in the test set.<a href="#fnref8">↩</a></p></li>
+<li id="fn9"><p>Due to the lack of data on web, which is less than half of iOS and less than 1/3 of Android.<a href="#fnref9">↩</a></p></li>
+<li id="fn10"><p>This is somewhat interesting because, on an aggregate basis, it is the <code>en_es</code> track that has the highest ROC.<a href="#fnref10">↩</a></p></li>
+</ol>
+</div>
