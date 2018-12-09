@@ -1,7 +1,7 @@
 baseurl = "/"
 relativeurls = true
 languageCode = "en-us"
-title = "An analysis of random things"
+title = "What I talk about when I don't talk about me"
 theme = "blackburn"
 googleAnalytics = ""
 ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
