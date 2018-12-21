@@ -1,0 +1,91 @@
+---
+title: Do I really need attention in my seq2seq model?
+author: Runze
+date: '2018-12-17'
+slug: do-i-really-need-attention
+categories:
+  - Data Analysis
+tags:
+  - Deep Learning
+  - NLP
+  - RNN
+description: ''
+topics: []
+---
+
+### Background
+
+Since the origin of the idea of the attention mechanism (Bahdanau et al., 2015), it has become a norm to try to add it in a seq2seq model, especially in translations. It is such an intuitive and powerful idea (not to mention the added benefit of peaking into a blackbox model by visualizing its attention weights) that many tutorials and blog posts made it sound like one should not even bother with a simpler model without it as the results would for sure be inferior. (Truthfully, even working on my own [post](https://runze.github.io/2017/09/07/second-attempt-at-building-a-language-translator/) on this topic earlier, I completely skipped the simpler approach too.) However, is it really the case? Does the added complexity introduced by an extra attention layer really translate into a significantly superior performance? In this post, I set off to construct a controlled experiment to estimate the exact benefit of using attentions in machine translations.
+
+Before going into the details of the case study, it is worth emphasizing that there is really no general answer or silver bullet to the above question as there are just too many factors that can change the results (e.g., the dataset, the model architecture, just to name a few). Hence, such questions should always be evaluated on a case-by-case basis and the goal of this post is by no means to offer any general advice. Rather, the goal is to show the importance of experimentation.
+
+In the following sections, I'll describe the key components of the models used in the experiment and present the results in the end. My complete code for this project is hosted [here](https://github.com/Runze/seq2seq-translation-attention/blob/master/translate-keras.ipynb).
+
+### Data
+
+Ideally, to make the study useful, I should run the experiment on a variety of datasets and report the results for each of them. However, due to time constraint, I have only tested it on one parallel English-French dataset provided by the [Tatoeba Project](http://www.manythings.org/anki/). The dataset originally have 155K bilingual pairs. After limiting them to sentences of length 2-20 tokens (by removing less than 1% of the data), I ended up with 154K pairs, of which, 80% were used as training data and the remaining 20% as validation. Keeping all tokens in the training data, I have an English vocabulary of 13K tokens and a French one of 22K. The tokenizations were done using the English and French tokenizers as provided by [spaCy](https://spacy.io/).
+
+### Models
+
+To make sure the results are comparable, I created two models with the exact same architecture with the only exception being an extra attention layer in one of them. Specifically,
+
++ The encoders in both cases are exactly the same (although trained separately). Simply put, each embedded input token from the source language (i.e., English) is processed by a single-layer, unidirectional LSTM with a hidden size of 256.
+
++ In the model without attention, the decoder is just another single-layer, unidirectional LSTM (also of size 256) that takes its initial states from the encoder final states and, in a teacher-forcing fashion, takes its input from the embedded true target language (i.e., French).
+
++ In the model with attention, at each decoding step, the decoder consults an extra attention layer that computes a weighted average of the encoder outputs at all timesteps (with the weight representing the amount of "attention" the decoder should pay to each of them, respectively) and combines that with the current decoder input to generate a prediction. Theoretically, in doing so, instead of cramming all encoded information into the initial states, the decoder has access to all of them at all times, *and* in an intelligent fashion. In particular, the attention layer I implemented in this experiment is exactly the same as the one I described in my prior [post](https://runze.github.io/2017/09/07/second-attempt-at-building-a-language-translator/#attention-layer).
+
+Both the source's and the target's embedding layers are initialized by [the fasttext embeddings](https://fasttext.cc/) in the respective languages. Based on my experiment, using these pre-trained embeddings doesn't do much to decrease the validation loss but makes it easy for the attention layer to find the right place to attend (based on the visualized attention weights). In terms of model size, both models have about 17M parameters, of which 60% come from the two embedding layers. The one with attention has 100K more parameters.
+
+### Training
+
+Both models were trained using the Adam optimizer and early stopping that was monitored on the validation cross-entropy loss. For the model without attention, it took 8 epochs to see the validation loss plateau; for the case with attention, it took 12. For each epoch on average, the latter also took almost twice as long to train.
+
+### Results
+
+The results from the two models are first evaluated quantitatively using the BLEU score, which essentially counts the amount of overlaps of n-grams between the actual and predicted translations. The results, measured using 4-grams, are shown below (on a scale of 0-1):^[When constructing the references for each predicted translation, I took advantage of the fact that the dataset has multiple target sentence for a single source sentence, so each prediction is evaluated against all the available references.]
+
+```{r bleu, warning=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(DT)
+data_frame(`With attention` = c('No', 'Yes'), `BLEU` = c(0.690, 0.685)) %>%
+  datatable(options = list(dom = 't', columnDefs = list(list(className = 'dt-center', targets = 1))))
+```
+
+Interestingly, it seems that the model with attention actually resulted in a slightly worse BLEU score in aggregate. But given the benefit of attention, did it do better with the long sentences? To test the hypothesis, I grouped the sentence pairs by the source length and re-computed the score per group below:
+
+<img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/bleu_by_len.png" alt="alt text" width="500">
+
+Based on the plot above, it does seem like the score from the attention model catches up in the end, but still not significantly higher, which is rather disappointing.
+
+But is BLEU really a good metric? Yes, it's useful as a scalable quantitative measure but n-gram overlaps don't always translate directly into translation quality. To get a better sense, it is often necessary to review some of the translations manually, and this is where [my expert French skills](https://twitter.com/jadorelacouture/status/912175822613524480) come to shine! In particular, I reviewed 100 randomly sampled predictions from the two models and compared them with the source and the actual target to determine whether they are good or not. In the table below, I present my results in the last two columns (1 if a translation is considered good):
+
+```{r preds, warning=FALSE, message=FALSE, echo=FALSE}
+true_vs_pred = read_csv('translate-true_vs_pred_samp.csv')
+true_vs_pred %>%
+  datatable(options = list())
+```
+
+In aggregate, the predictions from the no-attention model are deemed good 45% of the time and those from the attention model are good 41%. The difference is not statistically significant but it at least shows that the added attention layer did not add any significant improvement to the translation quality.
+
+While reviewing these translations myself, I have also noticed the notorious "[hallucination](https://arxiv.org/abs/1809.02156)" problem that plagues the image caption models where, in my case, the model generates pieces of translations that are not present in the source. For example, in the 6th example above, the source sentence is "the wedding will be held in a 17th century church," but neither predictions get the location of the wedding correct (the first one says on the beach and the second says in a cooking club).^[Both translations also just don't make sense.] The phenomenon is likely due to bias in the language priors (the decoder is a language model after all), which makes me a bit worried about whether those pre-trained language models, despite having been shown to significantly improve many downstream tasks, can potentially exacerbate this particular problem.
+
+Comparisons aside, I was also curious to see whether the learned attention weights could show that the decoder was at least paying attention to the "right" places from the encoder outputs. To get an idea visually, I randomly sampled 9 translations that match the true target exactly and visualized their attention weights below. (The horizontal axis is the source and the vertical is the target. The whiter a cell is, the heavier its attention weight is.) After seeing the results, I can only say... well, kind of.
+
+<img src="https://raw.githubusercontent.com/Runze/seq2seq-translation-attention/master/illustrations/attn_weights.png" alt="alt text" width="800">
+
+First of all, as shown above, unlike the crisp, precise patterns shown in the original paper, my attention weights are often spreaded out horizontally, meaning the decoder did not have a good idea where to look at exactly. There are some accurate cases (e.g., in the second matrix, *garçon* is mapped perfectly to *boy*, and in the 4th one, *pense* is mapped to *think*), but they are generally rather rare. Secondly, the attention weights usually fade out as the decoding timestep increases (i.e., as we move up vertically in the matrix). This is worrisome because it implies that the translations at the later timesteps received little help from the attention layer, which is ironically what the layer is for in the first place. Hence, all things considered, despite increasing the model size and making the training process longer, the attention layer in this case was still under-trained and did not offer too much help in the end.😔
+
+### Conclusion
+
+In this project, I tried to estimate the effect of the attention layer in a seq2seq translation model by performing a simple controlled experiment. After having compared the BLEU scores, manually reviewed a sample of the results, and visualized the learned attention weights, I unfortunately did not find any evidence suggesting any added benefit from the extra attention layer.
+
+That said, as mentioned in the beginning of this post, a *big* caveat of this study is that the above results are based on this particular dataset and these particular model architectures only. For example, the way I implemented the attention layer is only one of the many ways of doing so and there are *many* other approaches out there ranging from simple dot products between the previous hidden state and each of the encoder outputs to this rather peculiar way of only using the previous hidden state and the current decoder input as implemented in this PyTorch [tutorial](https://pytorch.org/tutorials/intermediate/seq2seq_translation_tutorial.html#attention-decoder).^[This survey [paper](https://arxiv.org/abs/1811.05544v1) is a good starting point to learn about the different common implementations of the attention layers.] Hence, without experimenting with any alternative architectures (or tuning the various hyperparameters), the goal of this project is not at all to say an attention layer is not necessary. Rather, my goal is simply to urge practitioners to always build a *solid*, albeit boring, baseline first before venturing into a much more complicated solution. What you find may very well surprise you, as it did here for me.🙂
+
+### References
+
+Bahdanau, D., Cho, K., & Bengio, Y. (2015). Neural Machine Translation by Jointly Learning to Align and Translate. In ICLR 2015.
+
+Dichao Hu (2018). An Introductory Survey on Attention Mechanisms in NLP Problems.
+
+Anna Rohrbach, Lisa Anne Hendricks, Kaylee Burns, Trevor Darrell, Kate Saenko (2018). Object Hallucination in Image Captioning.
