@@ -6,14 +6,21 @@ theme = "blackburn"
 googleAnalytics = ""
 ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
 
-[permalinks]
-    post = "/:year/:month/:day/:slug/"
-
 [[menu.main]]
     name = "Home"
     weight = 1
     identifier = "home"
     url = "/"
+[[menu.main]]
+    name = "Technical Posts"
+    weight = 2
+    identifier = "technical-posts"
+    url = "/technical-posts/"
+[[menu.main]]
+    name = "Other Musings"
+    weight = 3
+    identifier = "other-musings"
+    url = "/other-musings/"
 [[menu.main]]
     name = "About"
     url = "/about/"
@@ -23,9 +30,6 @@ ignoreFiles = ["\\.Rmd$", "_files$", "_cache$"]
 [[menu.main]]
     name = "LinkedIn"
     url = "https://www.linkedin.com/in/runze-wang-413a091a/"
-[[menu.main]]
-    name = "Twitter"
-    url = "https://twitter.com/runze_w"
 
 [params]
     description = "A website built through Hugo and blogdown."
